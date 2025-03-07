@@ -76,3 +76,5 @@ python __main__.py --testmode
 - **Comprehensive Logging**: Detailed training metrics and model checkpoints
 - **Early Stopping**: Prevent overfitting with validation-based early stopping
 - **Learning Rate Scheduling**: Adaptive learning rate for improved convergence
+
+# Test commit for github workflows
