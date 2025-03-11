@@ -84,7 +84,13 @@ class ModelWrapper(Wrapper): # inherits from Wrapper class
             if verbose:
                 print("Using pre-instantiated model. num_classes and keep_prob are ignored.\n")
         else:
+            if isinstance(model_class, str):
+              if model_class=="BaselineCNN":
+                 model_class = BaselineCNN
             model = model_class(num_classes, keep_prob)
+            
+
+            #model = model_class(num_classes, keep_prob)
             if verbose:
                 print(f"Instantiating new model with num_classes={num_classes} and keep_prob={keep_prob}")
         super().__init__(model, num_epochs, outdir, verbose, testmode)
@@ -145,6 +151,7 @@ class ModelWrapper(Wrapper): # inherits from Wrapper class
             correct = 0
             total = 0
             start_time = time.time()
+            nbatch = len(self.train_loader)
 
             for batch_idx, (images, labels) in enumerate(self.train_loader):
                 images, labels = images.to(self.device), labels.to(self.device)
@@ -155,10 +162,10 @@ class ModelWrapper(Wrapper): # inherits from Wrapper class
                 self.optimizer.step() # update the weights
 
                 if self.verbose:
-                    print(f'Epoch: {epoch + 1}/{self.num_epochs} | Batch: {batch_idx + 1} | Loss: {loss:.3f}')
+                    print(f'Epoch: {epoch + 1}/{self.num_epochs} | Batch: {batch_idx + 1}/{nbatch} | Loss: {loss:.3f}')
                 
                 if loss is None or math.isnan(loss) or math.isinf(loss):
-                    print(f"Error: Loss became undefined or infinite at Epoch: {epoch + 1} | Batch: {batch_idx + 1}.")
+                    print(f"Error: Loss became undefined or infinite at Epoch: {epoch + 1}/{nbatch} | Batch: {batch_idx + 1}.")
                     print(f"Stopping training.")
                     sys.exit(1)
                 
