@@ -67,9 +67,9 @@ class Wrapper:
             trainSubDataset = Subset(trainDataset, list(range(ntrain)))
             testSubDataset = Subset(testDataset, list(range(ntest)))
             valSubDataset = Subset(valDataset, list(range(ntest)))
-            train_factory = DataLoaderFactory(trainSubDataset,batch_size, num_workers=nwork)
-            test_factory = DataLoaderFactory(testSubDataset,  batch_size, num_workers=nwork)
-            val_factory = DataLoaderFactory(valSubDataset,    batch_size, num_workers=nwork)
+            train_factory = DataLoaderFactory(trainSubDataset, batch_size, num_workers=nwork)
+            test_factory = DataLoaderFactory(testSubDataset, batch_size, num_workers=nwork)
+            val_factory = DataLoaderFactory(valSubDataset, batch_size, num_workers=nwork)
         
         else:
             train_factory = DataLoaderFactory(trainDataset, batch_size)
@@ -145,6 +145,8 @@ class ModelWrapper(Wrapper): # inherits from Wrapper class
           'train_acc': [],
           'val_loss': [],
           'val_acc': [],
+          'test_loss': [], # added for testing function during each epoch
+          'test_acc': [],
           'learning_rates': [],
           'model_checkpoints': [],
           'time_per_epoch': []
@@ -175,7 +177,8 @@ class ModelWrapper(Wrapper): # inherits from Wrapper class
 
                 if self.verbose:
                     print(f"size of batch={len(images)}")
-                    print(f'Epoch: {epoch + 1}/{self.num_epochs} | Batch: {batch_idx + 1}/{nbatch} | Loss: {loss:.3f}')
+                    if batch_idx % 50 == 0:
+                        print(f'Epoch: {epoch + 1}/{self.num_epochs} | Batch: {batch_idx + 1}/{nbatch} | Loss: {loss:.3f}')
                 
                 if loss is None or math.isnan(loss) or math.isinf(loss):
                     print(f"Error: Loss became undefined or infinite at Epoch: {epoch + 1}/{nbatch} | Batch: {batch_idx + 1}.")
@@ -237,6 +240,17 @@ class ModelWrapper(Wrapper): # inherits from Wrapper class
                 print(f"Validation {epoch + 1} Average Loss: {val_loss} | Accuracy: {val_acc}")
                 print(f"{'-'*20}")
 
+            # After validation phase: Test phase
+            test_results = self.test() # make a call to the test function, returns a dictionary
+            test_loss = test_results['test_loss']
+            test_acc = test_results['test_accuracy']
+            train_log['test_loss'].append(test_loss)
+            train_log['test_acc'].append(test_acc)
+
+            if self.verbose:
+                print(f"Test {epoch + 1} Average Loss: {test_loss} | Accuracy: {test_acc}")
+                print(f"{'-'*20}")
+
             # update the learning rate
             train_log['learning_rates'].append(self.optimizer.param_groups[0]['lr'])
 
@@ -295,6 +309,7 @@ class ModelWrapper(Wrapper): # inherits from Wrapper class
         return train_log
     
     def test(self):
+        # set model to eval mode so we dont update the weights
         test_loss, test_acc = evaluate_model(self.model, self.test_loader, self.criterion, self.device)
         
         # save as a dictionary

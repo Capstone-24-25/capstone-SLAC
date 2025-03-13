@@ -37,7 +37,7 @@ os.makedirs(args.outdir, exist_ok=True)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # create a model wrapper
-model = ResNet
+model = BaselineCNN
 model_wrapper = ModelWrapper(model_class=model, num_classes=4, keep_prob=0.75, num_epochs=args.nepoch, verbose=args.verbose, testmode=args.testmode, outdir=args.outdir)
 
 # enable testmode for smaller sample size
