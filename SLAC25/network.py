@@ -138,6 +138,7 @@ class ModelWrapper(Wrapper): # inherits from Wrapper class
         """
         if self.verbose:
             self.summary()
+            print("\n{:=^70}".format(" Training Started "))
 
         train_log = {
           'epoch': [],
@@ -156,6 +157,10 @@ class ModelWrapper(Wrapper): # inherits from Wrapper class
 
         # training loop
         for epoch in range(self.num_epochs):
+            print("\n{:-^70}".format(f" Epoch {epoch+1}/{self.num_epochs} "))
+            print("Training Phase:")
+            print(f"{'Batch':>10} {'Loss':>12} {'Accuracy':>12} {'Progress':>12}")
+            print("-" * 46)
             # Training phase
             self.model.train()
             running_loss = 0.0
@@ -164,9 +169,9 @@ class ModelWrapper(Wrapper): # inherits from Wrapper class
             start_time = time.time()
             nbatch = len(self.train_loader)
 
-            tall = time.time()
+            #tall = time.time()
             for batch_idx, (images, labels) in enumerate(self.train_loader):
-                tbatch = time.time()
+                #tbatch = time.time()
 
                 images, labels = images.to(self.device), labels.to(self.device)
                 self.optimizer.zero_grad() # zero the gradients
@@ -174,14 +179,9 @@ class ModelWrapper(Wrapper): # inherits from Wrapper class
                 loss = self.criterion(outputs, labels) # compute the loss
                 loss.backward() # backpropagation
                 self.optimizer.step() # update the weights
-
-                if self.verbose:
-                    print(f"size of batch={len(images)}")
-                    if batch_idx % 50 == 0:
-                        print(f'Epoch: {epoch + 1}/{self.num_epochs} | Batch: {batch_idx + 1}/{nbatch} | Loss: {loss:.3f}')
                 
                 if loss is None or math.isnan(loss) or math.isinf(loss):
-                    print(f"Error: Loss became undefined or infinite at Epoch: {epoch + 1}/{nbatch} | Batch: {batch_idx + 1}.")
+                    print(f"Error: Loss became undefined or infinite at Epoch: {epoch + 1}/{self.num_epochs} | Batch: {batch_idx + 1}.")
                     print(f"Stopping training.")
                     sys.exit(1)
                 
@@ -190,14 +190,15 @@ class ModelWrapper(Wrapper): # inherits from Wrapper class
                 _, predicted = outputs.max(1) # gets the class with the highest probability
                 total += labels.size(0)
                 correct += predicted.eq(labels).sum().item() # if the predicted label equals the actual label, add 1 to the correct
-                tbatch = time.time()-tbatch
-                print("Time bacth", tbatch)
-            tall = time.time()-tall
-            print("Time all:", tall)
-                
-            
-            if self.verbose:
-                print(f"{'-'*10} Training Epoch {epoch + 1} finished {'-'*10}")
+                #tbatch = time.time()-tbatch
+                #print("Time batch:", tbatch)
+            #tall = time.time()-tall
+            #print("Time all:", tall)
+                if self.verbose and batch_idx % 10 == 0:
+                        progress = f"{batch_idx+1}/{nbatch}"
+                        batch_acc = correct / total
+                        print(f"{batch_idx+1:>10d} {loss.item():>12.4f} {batch_acc:>12.4f} {progress:>12}")
+
             # Calculate epoch stats
             epoch_loss = running_loss / len(self.train_loader)
             epoch_acc = correct / total
@@ -206,8 +207,9 @@ class ModelWrapper(Wrapper): # inherits from Wrapper class
             train_log['train_acc'].append(epoch_acc)
 
             if self.verbose:
-                print(f"Training Epoch {epoch + 1} Average Loss: {epoch_loss} | Accuracy: {epoch_acc}")
-                print(f"{'-'*10} Start Validation {epoch + 1} {'-'*10}")
+                print("\nTraining Epoch Summary:")
+                print(f"Average Loss: {epoch_loss:.4f} | Accuracy: {epoch_acc:.4f}")
+                print("\n{:-^70}".format(" Validation Phase "))
 
             # After training phase: Validation phase
             self.model.eval()
@@ -237,8 +239,9 @@ class ModelWrapper(Wrapper): # inherits from Wrapper class
             train_log['val_acc'].append(val_acc)
 
             if self.verbose:
-                print(f"Validation {epoch + 1} Average Loss: {val_loss} | Accuracy: {val_acc}")
-                print(f"{'-'*20}")
+                print(f"Validation Results:")
+                print(f"Average Loss: {val_loss:.4f} | Accuracy: {val_acc:.4f}")
+                print("\n{:-^70}".format(" Testing Phase "))
 
             # After validation phase: Test phase
             test_results = self.test() # make a call to the test function, returns a dictionary
@@ -248,8 +251,8 @@ class ModelWrapper(Wrapper): # inherits from Wrapper class
             train_log['test_acc'].append(test_acc)
 
             if self.verbose:
-                print(f"Test {epoch + 1} Average Loss: {test_loss} | Accuracy: {test_acc}")
-                print(f"{'-'*20}")
+                print(f"Testing Results:")
+                print(f"Average Loss: {test_loss:.4f} | Accuracy: {test_acc:.4f}")
 
             # update the learning rate
             train_log['learning_rates'].append(self.optimizer.param_groups[0]['lr'])
@@ -262,7 +265,7 @@ class ModelWrapper(Wrapper): # inherits from Wrapper class
             if val_loss < min_val_loss:
                 min_val_loss = val_loss
                 timeNow = datetime.now(pytz.timezone("America/Los_Angeles")).strftime("%Y%m%d%H%M%S")
-                model_name = os.path.join(self.outdir, f"BaselineCNN_{timeNow}_ep{epoch+1}.net")
+                model_name = os.path.join(self.outdir, f"ResNet_50_Transfer_Learning_{timeNow}_ep{epoch+1}.net")
                 save_file = os.path.abspath(model_name) 
                 try:
                     torch.save({
@@ -304,8 +307,9 @@ class ModelWrapper(Wrapper): # inherits from Wrapper class
             with open(log_file, "w") as f:
                 json.dump(train_log, f, indent=4)
 
-            print('Epoch {} - Train Loss: {:.4f}, Train Acc: {:.4f} - Val Loss: {:.4f}, Val Acc: {:.4f}, Minutes per epoch: {:.2f}'.format(epoch+1, epoch_loss, epoch_acc, val_loss, val_acc, time_per_epoch/60))
-        print('{} Training complete! {}'.format('-'*10, '-'*10))
+        # once training has finished, print finished
+        if self.verbose:
+            print("\n{:=^70}".format(" Training Complete "))
         return train_log
     
     def test(self):
@@ -332,8 +336,7 @@ class ModelWrapper(Wrapper): # inherits from Wrapper class
         # save the full log to a file
         with open(log_file, "w") as f:
             json.dump(full_log, f, indent=4)
-
-        print(f'Test Loss: {test_loss:.4f}, Test Accuracy: {test_acc:.4f}')
+            
         return test_log
 
 

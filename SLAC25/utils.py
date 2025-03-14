@@ -151,6 +151,8 @@ def visualize_performance(train_log, out_dir: str, file_name: str) -> None:
     axs[0].plot(epochs, train_loss, label='Training Loss')
     if val_loss is not None:
         axs[0].plot(epochs, val_loss, label='Validation Loss')
+    if test_loss is not None:
+        axs[0].plot(epochs, test_loss, label='Test Loss')
     axs[0].set_xlabel('Epoch')
     axs[0].set_ylabel('Loss')
     axs[0].legend()
@@ -158,14 +160,10 @@ def visualize_performance(train_log, out_dir: str, file_name: str) -> None:
     axs[1].plot(epochs, train_acc, label='Training Accuracy')
     if val_acc is not None:
         axs[1].plot(epochs, val_acc, label='Validation Accuracy')
-    axs[1].set_xlabel('Epoch')
-    axs[1].set_ylabel('Accuracy')
-    axs[1].legend()
-
-    if test_loss is not None:
-        axs[0].plot(epochs, test_loss, label='Test Loss')
     if test_acc is not None:
         axs[1].plot(epochs, test_acc, label='Test Accuracy')
+    axs[1].set_xlabel('Epoch')
+    axs[1].set_ylabel('Accuracy')
     axs[1].legend()
 
     plt.tight_layout()

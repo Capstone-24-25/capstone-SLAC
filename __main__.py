@@ -46,7 +46,7 @@ model_wrapper._prepareDataLoader(batch_size=args.batch_size, testmode=args.testm
                     max_imgs=args.maxImgs, nwork=args.nwork)
 
 # train the model
-train_log = model_wrapper.train()
+train_log = model_wrapper.train() # this already includes testing
 
 # visualize training performance
 visualize_performance(train_log, args.outdir, "train_log.png")

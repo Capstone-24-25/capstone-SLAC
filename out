@@ -1,0 +1,20 @@
+Instantiating new model with num_classes=4 and keep_prob=0.75
+######################################################################
+Training Setup:
+---------- Starting training on cuda ----------
+MODEL: BaselineCNN
+EPOCH COUNT: 100, BATCH SIZE: 64
+SAVING MODEL TO: /scratch/slac/models/reesekaro.baselineCNN_lrp01.4076701
+TEST MODE: False
+VERBOSE: True
+OPTIMIZER: Adam, INITIAL LR: 0.001
+EARLY STOPPING: Enabled (patience=7)
+LEARNING RATE SCHEDULER: Enabled (patience=5, factor=0.1)
+######################################################################
+
+========================== Training Started ==========================
+
+---------------------------- Epoch 1/100 -----------------------------
+Training Phase:
+     Batch         Loss     Accuracy     Progress
+----------------------------------------------

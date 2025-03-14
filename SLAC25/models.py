@@ -77,21 +77,26 @@ class ResNet(nn.Module):
             nn.Linear(256, num_classes)
         )
 
-    def freeze_resnet50(self):
+    def transfer_learn(self):
+        '''Function to transfer learn the model'''
+        print('Transfer learning..., freezing all parameters of resnet50')
+        # freeze all parameters of resnet50
         for param in self.resnet50.parameters():
             param.requires_grad = False
 
-    def unfreeze_resnet50(self):
-        '''Function to unfreeze layer 4 and fc layer of resnet50'''
+        print('Unfreezing layer 4 and fc layer of resnet50')
+        # unfreeze layer 4 and fc layer of resnet50
         for param in self.resnet50.layer4.parameters():
             param.requires_grad = True
         for param in self.resnet50.fc.parameters():
             param.requires_grad = True
 
-    def transfer_learn(self):
-        '''Function to transfer learn the model'''
-        self.freeze_resnet50()
-        self.unfreeze_resnet50()
+        print('Unfreezing fc_layer1 and fc_layer2')
+        # unfreeze fc_layer1 and fc_layer2
+        for param in self.fc_layer1.parameters():
+            param.requires_grad = True
+        for param in self.fc_layer2.parameters():
+            param.requires_grad = True
         print('Transfer learning complete')
         
     def forward(self, x):
