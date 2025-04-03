@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torchvision.models as models
+from torchsummary import summary
 
 ######################### Simple CNN Model ###############################
 
@@ -63,10 +64,21 @@ class BaselineCNN(nn.Module):
 ######################### ResNet Model ###############################
 
 class ResNet(nn.Module):
-    def __init__(self, num_classes, keep_prob):
+    def __init__(self, num_classes, keep_prob, resnet_type='50'):
         super(ResNet, self).__init__()
         self.num_classes = num_classes
-        self.resnet50 = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
+        self.resnet_type = resnet_type
+        if resnet_type == '50':
+            self.resnet = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)
+        elif resnet_type == '34':
+            self.resnet = models.resnet34(weights=models.ResNet34_Weights.DEFAULT)
+        else:
+            raise ValueError(f"Invalid ResNet type: {resnet_type}")
+        self.conv1_layer = nn.Sequential(
+            nn.Conv2d(3, 3, kernel_size=3, stride=2, padding=1), # 448x448x3 -> 224x224x3
+            nn.BatchNorm2d(3),
+            nn.ReLU(),
+        )
         self.fc_layer1 = nn.Sequential(
             nn.Linear(1000, 256),
             nn.BatchNorm1d(256),
@@ -77,33 +89,43 @@ class ResNet(nn.Module):
             nn.Linear(256, num_classes)
         )
 
+    def forward(self, x):
+        x = self.resnet(x) # 512x512x3 -> 1000
+        x = self.fc_layer1(x) # 1000 -> 256
+        x = self.fc_layer2(x) # 256 -> num_classes
+        return x
+
     def transfer_learn(self):
         '''Function to transfer learn the model'''
-        print('Transfer learning..., freezing all parameters of resnet50')
-        # freeze all parameters of resnet50
-        for param in self.resnet50.parameters():
+        print(f'Transfer learning..., freezing all parameters\n unfreezing the last layers of resnet')
+        # freeze all parameters of resnet
+        for param in self.resnet.parameters():
             param.requires_grad = False
 
-        print('Unfreezing layer 4 and fc layer of resnet50')
-        # unfreeze layer 4 and fc layer of resnet50
-        for param in self.resnet50.layer4.parameters():
-            param.requires_grad = True
-        for param in self.resnet50.fc.parameters():
+        # unfreeze last layer of resnet
+        for param in self.resnet.fc.parameters():
             param.requires_grad = True
 
-        print('Unfreezing fc_layer1 and fc_layer2')
-        # unfreeze fc_layer1 and fc_layer2
+        # unfreeze fc_layer1
         for param in self.fc_layer1.parameters():
             param.requires_grad = True
+
+        # unfreeze fc_layer2
         for param in self.fc_layer2.parameters():
             param.requires_grad = True
+
         print('Transfer learning complete')
         
-    def forward(self, x):
-        x = self.resnet50(x)
-        x = self.fc_layer1(x)
-        x = self.fc_layer2(x)
-        return x
+
+    def print_trainable_parameters(self):
+        '''Function to print the trainable parameters'''
+        for name, param in self.named_parameters():
+            print(f'{name}: {"trainable" if param.requires_grad else "frozen"}')
+
+    def print_model_summary(self):
+        '''Print model summary only for the resnet part'''
+        summary(self.resnet, (3, 224, 224))
+    
     
     def summary(self):
         print(self)

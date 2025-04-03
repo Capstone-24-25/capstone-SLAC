@@ -1,3 +1,7 @@
 __pycache__/
 .ipynb_checkpointscheckpoint.pt
 checkpoint.pt
+out_rn34
+out_rn50
+out_rn34_512
+out

@@ -37,7 +37,10 @@ os.makedirs(args.outdir, exist_ok=True)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # create a model wrapper
-model = BaselineCNN
+model = ResNet(num_classes = 4, keep_prob = 0.75, resnet_type = '34')
+model.transfer_learn()
+model.print_trainable_parameters()
+#model.print_model_summary()
 model_wrapper = ModelWrapper(model_class=model, num_classes=4, keep_prob=0.75, num_epochs=args.nepoch, verbose=args.verbose, testmode=args.testmode, outdir=args.outdir)
 
 # enable testmode for smaller sample size
@@ -49,5 +52,4 @@ model_wrapper._prepareDataLoader(batch_size=args.batch_size, testmode=args.testm
 train_log = model_wrapper.train() # this already includes testing
 
 # visualize training performance
-visualize_performance(train_log, args.outdir, "train_log.png")
-
+visualize_performance(train_log, args.outdir, "train_log_512_34.png")

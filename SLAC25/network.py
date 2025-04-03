@@ -73,7 +73,7 @@ class Wrapper:
         
         else:
             train_factory = DataLoaderFactory(trainDataset, batch_size)
-            test_factory = DataLoaderFactory(testDataPath, batch_size)
+            test_factory = DataLoaderFactory(testDataset, batch_size)
             val_factory = DataLoaderFactory(valDataset, batch_size)
 
         train_factory.setSequentialSampler()
@@ -183,7 +183,7 @@ class ModelWrapper(Wrapper): # inherits from Wrapper class
                 if loss is None or math.isnan(loss) or math.isinf(loss):
                     print(f"Error: Loss became undefined or infinite at Epoch: {epoch + 1}/{self.num_epochs} | Batch: {batch_idx + 1}.")
                     print(f"Stopping training.")
-                    sys.exit(1)
+                    break
                 
                 # Update running stats
                 running_loss += loss.item() # extract the tensor and return a float
@@ -194,7 +194,7 @@ class ModelWrapper(Wrapper): # inherits from Wrapper class
                 #print("Time batch:", tbatch)
             #tall = time.time()-tall
             #print("Time all:", tall)
-                if self.verbose and batch_idx % 10 == 0:
+                if self.verbose and batch_idx % 100 == 0:
                         progress = f"{batch_idx+1}/{nbatch}"
                         batch_acc = correct / total
                         print(f"{batch_idx+1:>10d} {loss.item():>12.4f} {batch_acc:>12.4f} {progress:>12}")
@@ -300,7 +300,7 @@ class ModelWrapper(Wrapper): # inherits from Wrapper class
                 self.EarlyStopping(val_loss, self.model)
                 if self.EarlyStopping.early_stop: # flag that is raised or not
                     print("Early stopping")
-                    sys.exit(1) # stop training
+                    break # stop training
 
             # save the train log to a file
             log_file = f"{self.outdir}/train_log.json"
