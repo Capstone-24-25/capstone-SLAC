@@ -1,0 +1,4 @@
+  File "__main__.py", line 31
+    args.outdir = f"/scratch/slac/models/{username}.{slurm_jname}.{slurm_jid}"
+                                                                             ^
+SyntaxError: invalid syntax
