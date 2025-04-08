@@ -15,5 +15,5 @@ SLAC25.egg-info/entry_points.txt
 SLAC25.egg-info/requires.txt
 SLAC25.egg-info/top_level.txt
 SLAC25/scripts/base_mod_test.py
-SLAC25/test/test_dataloader.py
 SLAC25/test/test_dataset.py
+SLAC25/tests/test_utils.py
