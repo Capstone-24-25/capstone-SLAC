@@ -37,14 +37,10 @@ def mock_training_loop(dataloader):
         assert labels.shape[0] > 0
     print("Training loop executed successfully.")
 
-def test_dataloader_factory():
-    # Step 1: Create fake data
+# Test for random sampler
+def test_random_sampler():
     labels_csv_path = create_fake_data()
-
-    # Step 2: Initialize the dataset
     dataset = ImageDataset(labels_csv_path)
-
-    # Step 3: Initialize DataLoaderFactory
     factory = DataLoaderFactory(
         dataset=dataset,
         batch_size=4,
@@ -52,17 +48,27 @@ def test_dataloader_factory():
         pin_memory=False,
         drop_last=False
     )
-
-    # Step 4: Set the sampler (e.g., random sampler)
     factory.setRandomSampler()
-
-    # Step 5: Create a DataLoader
     dataloader = factory.outputDataLoader()
-
-    # Step 6: Pass DataLoader to mock training loop
     mock_training_loop(dataloader)
+    print("Random sampler test passed successfully.")
 
-    print("All tests passed successfully.")
+# Test for sequential sampler
+def test_sequential_sampler():
+    labels_csv_path = create_fake_data()
+    dataset = ImageDataset(labels_csv_path)
+    factory = DataLoaderFactory(
+        dataset=dataset,
+        batch_size=4,
+        num_workers=0,
+        pin_memory=False,
+        drop_last=False
+    )
+    factory.setSequentialSampler()
+    dataloader = factory.outputDataLoader()
+    mock_training_loop(dataloader)
+    print("Sequential sampler test passed successfully.")
 
 if __name__ == "__main__":
-    test_dataloader_factory()
+    test_random_sampler()
+    test_sequential_sampler()
