@@ -18,10 +18,10 @@ def create_fake_data():
     for i in range(10):
         # Create a fake image
         img = Image.new("RGB", (64, 64), color=(i * 25, i * 25, i * 25))
-        img_path = os.path.join(image_dir, "image_{i}.png".format(i))
+        img_path = os.path.join(image_dir, f"image_{i}.png")
         img.save(img_path)
         # Create a fake label
-        labels.append({"image_path": img_path, "label": i % 4})  
+        labels.append({"image_path": img_path, "label_id": i % 4})  
 
     # Save labels to a CSV file
     labels_df = pd.DataFrame(labels)
@@ -31,19 +31,18 @@ def create_fake_data():
 
 # Mock training loop
 def mock_training_loop(dataloader):
-    for batch in dataloader:
+    for batch in dataloader:  
         images, labels = batch
         assert images.shape[0] > 0  # Ensure batch has data
         assert labels.shape[0] > 0
     print("Training loop executed successfully.")
 
-# Unit test for DataLoaderFactory
 def test_dataloader_factory():
     # Step 1: Create fake data
     labels_csv_path = create_fake_data()
 
     # Step 2: Initialize the dataset
-    dataset = ImageDataset(csv_file=labels_csv_path)
+    dataset = ImageDataset(labels_csv_path)
 
     # Step 3: Initialize DataLoaderFactory
     factory = DataLoaderFactory(
@@ -54,16 +53,14 @@ def test_dataloader_factory():
         drop_last=False
     )
 
-    # Step 4: Create DataLoader with different sampler types
-    for sampler_type in ["random", "sequential", "subset"]:
-        print("Testing sampler type: {}".format(sampler_type))
-        dataloader = factory.create_dataloader(
-            sampler_type=sampler_type,
-            shuffle=(sampler_type == "random"),
-            indices=list(range(5)) if sampler_type == "subset" else None
-        )
-        # Step 5: Pass DataLoader to mock training loop
-        mock_training_loop(dataloader)
+    # Step 4: Set the sampler (e.g., random sampler)
+    factory.setRandomSampler()
+
+    # Step 5: Create a DataLoader
+    dataloader = factory.outputDataLoader()
+
+    # Step 6: Pass DataLoader to mock training loop
+    mock_training_loop(dataloader)
 
     print("All tests passed successfully.")
 

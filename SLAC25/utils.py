@@ -125,6 +125,8 @@ def visualize_performance(train_log, out_dir: str, file_name: str) -> None:
     val_loss = train_log['val_loss']
     train_acc = train_log['train_acc']
     val_acc = train_log['val_acc']
+    test_loss = train_log['test_loss']
+    test_acc = train_log['test_acc']
 
     # Check if validation data is all zeros
     if all(v == 0 for v in val_loss):
@@ -135,12 +137,22 @@ def visualize_performance(train_log, out_dir: str, file_name: str) -> None:
         print("Warning: Validation accuracy data is all zeros.")
         val_acc = None
 
+    if all(v == 0 for v in test_loss):
+        print("Warning: Test loss data is all zeros.")
+        test_loss = None
+
+    if all(v == 0 for v in test_acc):
+        print("Warning: Test accuracy data is all zeros.")
+        test_acc = None
+
     # plotting
     fig, axs = plt.subplots(1, 2, figsize=(15, 5))
 
     axs[0].plot(epochs, train_loss, label='Training Loss')
     if val_loss is not None:
         axs[0].plot(epochs, val_loss, label='Validation Loss')
+    if test_loss is not None:
+        axs[0].plot(epochs, test_loss, label='Test Loss')
     axs[0].set_xlabel('Epoch')
     axs[0].set_ylabel('Loss')
     axs[0].legend()
@@ -148,6 +160,8 @@ def visualize_performance(train_log, out_dir: str, file_name: str) -> None:
     axs[1].plot(epochs, train_acc, label='Training Accuracy')
     if val_acc is not None:
         axs[1].plot(epochs, val_acc, label='Validation Accuracy')
+    if test_acc is not None:
+        axs[1].plot(epochs, test_acc, label='Test Accuracy')
     axs[1].set_xlabel('Epoch')
     axs[1].set_ylabel('Accuracy')
     axs[1].legend()

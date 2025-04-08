@@ -1,0 +1,6 @@
+Metadata-Version: 2.4
+Name: SLAC25
+Version: 0.1
+Requires-Dist: pandas
+Requires-Dist: torch
+Requires-Dist: torchvision
