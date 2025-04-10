@@ -15,14 +15,22 @@ from SLAC25.transform import TransformV1
 
 
 class ImageDataset(Dataset):
-  def __init__(self, csvfilePath, transform=None, config=None, recordTransform=False):
+  def __init__(self, csvfilePath, image_size=512, transform=None, config=None, recordTransform=False):
     self.csvfilePath = csvfilePath
     self.dataframe = pd.read_csv(csvfilePath)
     self.datasetType = self._checkTrainTest()
     self.config = self._loadConfig()
-    self.transform = None
-    self._setupTransform(transform, config, recordTransform)
+    self.image_size = image_size
 
+    if transform is None:
+      self.transform = TransformV1(
+        image_size=self.image_size, # pass the image size
+        config=self.config.get("transform", None), # pass the config
+        recordTransform=recordTransform # pass the recordTransform
+      )
+    else:
+      self.transform = transform
+    
     self.datasize = self.dataframe.shape[0]
     self.numLabel = self.dataframe['label_id'].nunique()
     self.labeldict = {idnum: self.dataframe.index[self.dataframe['label_id'] == idnum].to_list() for idnum in self.dataframe['label_id'].value_counts().index}

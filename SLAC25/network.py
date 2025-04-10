@@ -30,59 +30,7 @@ class Wrapper:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model.to(self.device)  # Move model to device
         self.testmode = testmode
-        self._prepareDataLoader()
 
-    def _prepareDataLoader(self, batch_size=32, testmode=False, max_imgs=None, nwork=0):
-        fileDir = os.path.dirname(os.path.abspath(__file__))
-        if fileDir.endswith("SLAC25"):
-            trainDataPath = os.path.join(fileDir, "..", "data", "train_info.csv")
-            testDataPath = os.path.join(fileDir, "..", "data", "test_info.csv")
-            valDataPath = os.path.join(fileDir, "..", "data", "val_info.csv")
-            trainDataPath = os.path.abspath(trainDataPath)
-            testDataPath = os.path.abspath(testDataPath)
-            valDataPath = os.path.abspath(valDataPath)
-        
-        elif fileDir.endswith("capstone-SLAC"):
-            trainDataPath = os.path.join(fileDir, "data", "train_info.csv")
-            testDataPath = os.path.join(fileDir, "data", "test_info.csv")
-            valDataPath = os.path.join(fileDir, "data", "val_info.csv")
-            trainDataPath = os.path.abspath(trainDataPath)
-            testDataPath = os.path.abspath(testDataPath)
-            valDataPath = os.path.abspath(valDataPath)
-        
-        trainDataset = ImageDataset(trainDataPath)
-        testDataset = ImageDataset(testDataPath)
-        valDataset = ImageDataset(valDataPath)
-
-        if testmode: # take only first 50 data
-            trainSubDataset = Subset(trainDataset, list(range(50)))
-            testSubDataset = Subset(testDataset, list(range(10)))
-            valSubDataset = Subset(valDataset, list(range(10)))
-            train_factory = DataLoaderFactory(trainSubDataset, batch_size=5)
-            test_factory = DataLoaderFactory(testSubDataset, batch_size=5)
-            val_factory = DataLoaderFactory(valSubDataset, batch_size=5)
-        elif max_imgs is not None:
-            ntrain = int(.9*max_imgs)
-            ntest=max_imgs-ntrain
-            trainSubDataset = Subset(trainDataset, list(range(ntrain)))
-            testSubDataset = Subset(testDataset, list(range(ntest)))
-            valSubDataset = Subset(valDataset, list(range(ntest)))
-            train_factory = DataLoaderFactory(trainSubDataset, batch_size, num_workers=nwork)
-            test_factory = DataLoaderFactory(testSubDataset, batch_size, num_workers=nwork)
-            val_factory = DataLoaderFactory(valSubDataset, batch_size, num_workers=nwork)
-        
-        else:
-            train_factory = DataLoaderFactory(trainDataset, batch_size)
-            test_factory = DataLoaderFactory(testDataset, batch_size)
-            val_factory = DataLoaderFactory(valDataset, batch_size)
-
-        train_factory.setSequentialSampler()
-        test_factory.setSequentialSampler()
-        val_factory.setSequentialSampler()
-
-        self.train_loader = train_factory.outputDataLoader()
-        self.test_loader = test_factory.outputDataLoader()
-        self.val_loader = val_factory.outputDataLoader()
 
 
 class ModelWrapper(Wrapper): # inherits from Wrapper class
@@ -97,13 +45,90 @@ class ModelWrapper(Wrapper): # inherits from Wrapper class
               if model_class=="BaselineCNN":
                  model_class = BaselineCNN
             model = model_class(num_classes, keep_prob)
-            
 
             #model = model_class(num_classes, keep_prob)
             if verbose:
                 print(f"Instantiating new model with num_classes={num_classes} and keep_prob={keep_prob}")
         super().__init__(model, num_epochs, outdir, verbose, testmode)
+        self.phase = 1
+
+class ModelWrapper(Wrapper):
+    def __init__(self, model_class, num_classes=4, keep_prob=0.75, num_epochs=10, outdir='./models', verbose=False, testmode=False):
+        super().__init__(model_class, num_epochs, outdir, verbose, testmode)
+        self.phase = 1  # Add this to track which training phase we're in
+
+    def _prepareDataLoader(self, batch_size=32, testmode=False, max_imgs=None, nwork=0):
+        """Prepare data loaders for both phases using the same image set"""
+        fileDir = os.path.dirname(os.path.abspath(__file__))
+        if fileDir.endswith("SLAC25"):
+            trainDataPath = os.path.join(fileDir, "..", "data", "train_info.csv")
+            testDataPath = os.path.join(fileDir, "..", "data", "test_info.csv")
+            valDataPath = os.path.join(fileDir, "..", "data", "val_info.csv")
+            trainDataPath = os.path.abspath(trainDataPath)
+            testDataPath = os.path.abspath(testDataPath)
+            valDataPath = os.path.abspath(valDataPath)
+        elif fileDir.endswith("capstone-SLAC"):
+            trainDataPath = os.path.join(fileDir, "data", "train_info.csv")
+            testDataPath = os.path.join(fileDir, "data", "test_info.csv")
+            valDataPath = os.path.join(fileDir, "data", "val_info.csv")
+            trainDataPath = os.path.abspath(trainDataPath)
+            testDataPath = os.path.abspath(testDataPath)
+            valDataPath = os.path.abspath(valDataPath)
+
+        # Create datasets with different image sizes but same data
+        phase1_trainDataset = ImageDataset(trainDataPath, image_size=224)  # Phase 1 size
+        phase2_trainDataset = ImageDataset(trainDataPath, image_size=512)  # Phase 2 size
+        testDataset = ImageDataset(testDataPath, image_size=512)
+        valDataset = ImageDataset(valDataPath, image_size=512)
+
+        if testmode:
+            # Use the same indices for both phases in test mode
+            indices = list(range(50))
+            phase1_trainSubDataset = Subset(phase1_trainDataset, indices)
+            phase2_trainSubDataset = Subset(phase2_trainDataset, indices)
+            testSubDataset = Subset(testDataset, list(range(10)))
+            valSubDataset = Subset(valDataset, list(range(10)))
+            
+            phase1_train_factory = DataLoaderFactory(phase1_trainSubDataset, batch_size=5)
+            phase2_train_factory = DataLoaderFactory(phase2_trainSubDataset, batch_size=5)
+            test_factory = DataLoaderFactory(testSubDataset, batch_size=5)
+            val_factory = DataLoaderFactory(valSubDataset, batch_size=5)
         
+        elif max_imgs is not None:
+            ntrain = int(.9*max_imgs)
+            ntest = max_imgs-ntrain
+            # Use the same indices for both phases
+            indices = list(range(ntrain))
+            phase1_trainSubDataset = Subset(phase1_trainDataset, indices)
+            phase2_trainSubDataset = Subset(phase2_trainDataset, indices)
+            testSubDataset = Subset(testDataset, list(range(ntest)))
+            valSubDataset = Subset(valDataset, list(range(ntest)))
+            
+            phase1_train_factory = DataLoaderFactory(phase1_trainSubDataset, batch_size, num_workers=nwork)
+            phase2_train_factory = DataLoaderFactory(phase2_trainSubDataset, batch_size, num_workers=nwork)
+            test_factory = DataLoaderFactory(testSubDataset, batch_size, num_workers=nwork)
+            val_factory = DataLoaderFactory(valSubDataset, batch_size, num_workers=nwork)
+        
+        else:
+            phase1_train_factory = DataLoaderFactory(phase1_trainDataset, batch_size, num_workers=nwork)
+            phase2_train_factory = DataLoaderFactory(phase2_trainDataset, batch_size, num_workers=nwork)
+            test_factory = DataLoaderFactory(testDataset, batch_size, num_workers=nwork)
+            val_factory = DataLoaderFactory(valDataset, batch_size, num_workers=nwork)
+
+        # Set sequential samplers
+        phase1_train_factory.setSequentialSampler()
+        phase2_train_factory.setSequentialSampler()
+        test_factory.setSequentialSampler()
+        val_factory.setSequentialSampler()
+
+        # Create the data loaders
+        self.phase1_train_loader = phase1_train_factory.outputDataLoader()
+        self.phase2_train_loader = phase2_train_factory.outputDataLoader()
+        self.test_loader = test_factory.outputDataLoader()
+        self.val_loader = val_factory.outputDataLoader()
+
+        # Set initial train_loader based on phase
+        self.train_loader = self.phase1_train_loader if self.phase == 1 else self.phase2_train_loader
     def summary(self):
         """
         Print a summary of the training setup configuration.
@@ -312,6 +337,44 @@ class ModelWrapper(Wrapper): # inherits from Wrapper class
             print("\n{:=^70}".format(" Training Complete "))
         return train_log
     
+    def train_phase1(self):
+        '''train phase 1 with 224x224 images'''
+        self.phase = 1
+        self.model.transfer_learn_phase1() # function to activate the transfer learning for p1
+        self.train_loader = self.phase1_train_loader
+        if self.verbose:
+            print("\n{:=^70}".format(" Starting Phase 1 Training (224x224) "))
+            self.model.print_trainable_parameters()
+        
+        train_log = self.train() # train the model
+        # Save the phase 1 weights
+        timeNow = datetime.now(pytz.timezone("America/Los_Angeles")).strftime("%Y%m%d%H%M%S")
+        phase1_weights = os.path.join(self.outdir, f"phase1_weights_{timeNow}.pth")
+        torch.save(self.model.state_dict(), phase1_weights)
+        if self.verbose:
+            print(f"Phase 1 weights saved to {phase1_weights}")
+        
+        return train_log, phase1_weights
+
+    def train_phase2(self, phase1_weights):
+        """Train phase 2 with 512x512 images"""
+        self.phase = 2
+        
+        # Load phase 1 weights and transfer learn phase 2
+        self.model.load_state_dict(torch.load(phase1_weights))
+        self.model.transfer_learn_phase2()
+        
+        if self.verbose:
+            print("\n{:=^70}".format(" Starting Phase 2 Training (512x512) "))
+            self.model.print_trainable_parameters()
+        
+        # Reset optimizer and learning rate scheduler for phase 2
+        self.optimizer = optim.Adam(filter(lambda p: p.requires_grad, self.model.parameters()))
+        self.lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', factor=0.1, patience=5, min_lr=1e-6)
+        
+        train_log = self.train()
+        return train_log
+
     def test(self):
         # set model to eval mode so we dont update the weights
         test_loss, test_acc = evaluate_model(self.model, self.test_loader, self.criterion, self.device)
@@ -338,6 +401,7 @@ class ModelWrapper(Wrapper): # inherits from Wrapper class
             json.dump(full_log, f, indent=4)
             
         return test_log
+
 
 
 if __name__ == "__main__":

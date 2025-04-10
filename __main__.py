@@ -9,7 +9,8 @@ from argparse import ArgumentParser
 ########## Start ##########
 ap = ArgumentParser()
 ap.add_argument("--testmode", action="store_true", help="Enable test mode with small dataset")
-ap.add_argument("--nepoch", type=int, default=10)
+ap.add_argument("--phase1_nepoch", type=int, default=10, help="Number of epochs for phase 1 training")
+ap.add_argument("--phase2_nepoch", type=int, default=10, help="Number of epochs for phase 2 training")
 ap.add_argument("--outdir", type=str, default=None)
 ap.add_argument("--lr", type=float, default=0.001)
 ap.add_argument("--batch_size", type=int, default=32)
@@ -20,7 +21,8 @@ args = ap.parse_args()
 
 if args.testmode: # if testmode, no need to specify outdir in slurmlogs
     args.outdir = "./models"
-    args.nepoch = 3
+    args.phase1_nepoch = 2
+    args.phase2_nepoch = 2
     args.verbose = True
 else:
     if args.outdir is None:
@@ -37,19 +39,41 @@ os.makedirs(args.outdir, exist_ok=True)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # create a model wrapper
-model = ResNet(num_classes = 4, keep_prob = 0.75, resnet_type = '34')
-model.transfer_learn()
-model.print_trainable_parameters()
-#model.print_model_summary()
-model_wrapper = ModelWrapper(model_class=model, num_classes=4, keep_prob=0.75, num_epochs=args.nepoch, verbose=args.verbose, testmode=args.testmode, outdir=args.outdir)
+model = ResNet(num_classes=4, keep_prob=0.75, hidden_num=512)
+model_wrapper = ModelWrapper(
+    model_class=model,
+    num_classes=4,
+    keep_prob=0.75,
+    num_epochs=args.phase1_nepoch,  # Start with phase 1 epochs
+    verbose=args.verbose,
+    testmode=args.testmode,
+    outdir=args.outdir
+)
 
 # enable testmode for smaller sample size
 # enable verbose for detailed info
-model_wrapper._prepareDataLoader(batch_size=args.batch_size, testmode=args.testmode,
-                    max_imgs=args.maxImgs, nwork=args.nwork)
+model_wrapper._prepareDataLoader(
+    batch_size=args.batch_size, 
+    testmode=args.testmode,
+    max_imgs=args.maxImgs, 
+    nwork=args.nwork)
 
-# train the model
-train_log = model_wrapper.train() # this already includes testing
+# Phase 1 Training (224x224)
+print("\n=== Starting Phase 1 Training (224x224) ===")
+phase1_log, phase1_weights = model_wrapper.train_phase1()
+visualize_performance(phase1_log, args.outdir, "train_log_phase1_224.png")
 
-# visualize training performance
-visualize_performance(train_log, args.outdir, "train_log_512_34.png")
+# Phase 2 Training (512x512)
+print("\n=== Starting Phase 2 Training (512x512) ===")
+model_wrapper.num_epochs = args.phase2_nepoch  # Update epochs for phase 2
+phase2_log = model_wrapper.train_phase2(phase1_weights)
+visualize_performance(phase2_log, args.outdir, "train_log_phase2_512.png")
+
+# Save combined training logs
+combined_log = {
+    'phase1': phase1_log,
+    'phase2': phase2_log
+}
+
+with open(f"{args.outdir}/combined_train_log.json", "w") as f:
+    json.dump(combined_log, f, indent=4)

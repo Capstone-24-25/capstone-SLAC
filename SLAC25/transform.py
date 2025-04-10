@@ -27,14 +27,14 @@ tfConfig = {
 }
 
 class TransformV1():
-  def __init__(self, config=None, recordTransform=False):
+  def __init__(self, image_size=512, transform=None, config=None, recordTransform=False):
     self.tf_log = None
     self.tf_config = None
-
+    self.image_size = image_size
     self._setTfConfig(config)
     self._setTfLog(recordTransform) # use to record transformation info
     self.preprocessing = v2.Compose([
-      v2.Resize((512, 512), interpolation=v2.InterpolationMode.BILINEAR, antialias=True),
+      v2.Resize((self.image_size, self.image_size), interpolation=v2.InterpolationMode.BILINEAR, antialias=True),
       v2.PILToTensor(),
       v2.ConvertImageDtype(torch.float32)
     ])
@@ -108,7 +108,6 @@ class TransformV1():
         angle = random.uniform(*params["degrees"])
         self._recordTf(idx, f"Rotating by {angle:.2f} degrees")
         return v2.RandomRotation(degrees=(angle, angle))(img)
-    
     return img
 
   def _random_horizontal_flip(self, img, idx):
