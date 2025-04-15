@@ -1,0 +1,2 @@
+[console_scripts]
+SLAC25.testbase = SLAC25.scripts.base_mod_test:main
