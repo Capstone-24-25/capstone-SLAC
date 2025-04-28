@@ -7,59 +7,84 @@ import json
 import os
 import pandas as pd
 from torchvision import transforms
-from torch.utils.data import DataLoader
+from torch.utils.data import Dataset, DataLoader
 from argparse import ArgumentParser
+from PIL import Image
 
-from SLAC25.dataset import ImageDataset
 from SLAC25.utils import evaluate_model
-from SLAC25.models import BaselineCNN, ResNet
+from SLAC25.models import BaselineCNN
 from SLAC25.sampler import StratifiedSampler, WeightedRandomSampler, EqualGroupSampler, create_sample_weights
 
-def fit(model, dataloader, num_epochs, optimizer, criterion, device):
+# AutoEncoder for feature compression
+class AutoEncoder(nn.Module):
+    def __init__(self, encoded_dim):
+        assert 128 <= encoded_dim <= 10000, "encoded_dim must be between 128 and 10,000"
+        super(AutoEncoder, self).__init__()
+        self.encoder = nn.Sequential(
+            nn.Linear(3 * 512 * 512, 1024),
+            nn.ReLU(True),
+            nn.Linear(1024, encoded_dim)
+        )
+        self.decoder = nn.Sequential(
+            nn.Linear(encoded_dim, 1024),
+            nn.ReLU(True),
+            nn.Linear(1024, 3 * 512 * 512),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        x = x.view(x.size(0), -1)
+        z = self.encoder(x)
+        x_hat = self.decoder(z)
+        return x_hat, z
+
+# Dataset for training autoencoder (image → image)
+class AutoEncoderTrainingDataset(Dataset):
+    def __init__(self, csv_path, device):
+        self.df = pd.read_csv(csv_path)
+        self.device = device
+
+    def __len__(self):
+        return len(self.df)
+
+    def __getitem__(self, idx):
+        row = self.df.iloc[idx]
+        image_path = row['image_path']
+        img = Image.open(image_path).convert('RGB')
+        img = transforms.Resize((512, 512))(img)
+        img = transforms.ToTensor()(img).to(self.device)
+        return img.view(-1), img.view(-1)
+
+# Training loop for autoencoder
+def pretrain_autoencoder(model, dataloader, num_epochs, optimizer, criterion, device):
+    print("Pretraining autoencoder...")
     model.train()
     for epoch in range(num_epochs):
         running_loss = 0.0
-        correct = 0
-        total = 0
-
-        for inputs, labels in dataloader:
-            inputs, labels = inputs.to(device), labels.to(device)
+        for inputs, targets in dataloader:
+            inputs, targets = inputs.to(device), targets.to(device)
 
             optimizer.zero_grad()
-            outputs = model(inputs)
-            loss = criterion(outputs, labels)
+            outputs, _ = model(inputs)
+            loss = criterion(outputs, targets)
             loss.backward()
             optimizer.step()
 
             running_loss += loss.item() * inputs.size(0)
-            _, predicted = torch.max(outputs.data, 1)
-            total += labels.size(0)
-            correct += (predicted == labels).sum().item()
+        epoch_loss = running_loss / len(dataloader.dataset)
+        print(f"[AutoEncoder Epoch {epoch+1}] Loss: {epoch_loss:.4f}")
 
-        epoch_loss = running_loss / total
-        epoch_acc = correct / total
-
-        print(f"Epoch [{epoch+1}/{num_epochs}] Loss: {epoch_loss:.4f} Accuracy: {epoch_acc:.4f}")
-
-
-# Argument Parsing
+# Add optional argument for AE pretraining
 ap = ArgumentParser()
 ap.add_argument("--method", type=str, choices=["original", "stratified", "equal", "weighted"], help="Sampling method")
-ap.add_argument("--num_epochs", type=int, default=5, help="Number of epochs for training")
+ap.add_argument("--num_epochs", type=int, default=5, help="Number of epochs for training classifier")
+ap.add_argument("--ae_epochs", type=int, default=10, help="Number of epochs for autoencoder pretraining")
 ap.add_argument("--learning_rate", type=float, default=0.001, help="Learning rate")
 ap.add_argument("--batch_size", type=int, default=32, help="Batch size")
-ap.add_argument("--model", type=str, choices=["BaselineCNN", "ResNet"], default="BaselineCNN", help="Model type")
+ap.add_argument("--encoded_dim", type=int, default=128, help="Dimension of the compressed feature vector (128 to 10000)")
 ap.add_argument("--outdir", type=str, default="./models", help="Directory to save results")
 ap.add_argument("--verbose", action="store_true", help="Enable verbose output")
 args = ap.parse_args()
-
-# Data Augmentation (optional, can be used inside ImageDataset or transform pipeline if needed)
-augmentation = transforms.Compose([
-    transforms.RandomHorizontalFlip(),
-    transforms.RandomRotation(20),
-    transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
-    transforms.RandomResizedCrop(224, scale=(0.8, 1.0))
-])
 
 # Load dataset CSV (sampled)
 dir_name = os.path.dirname(__file__)
@@ -69,11 +94,55 @@ df_sampled = df.sample(frac=0.05, random_state=42)
 sampled_csv_file = os.path.join(dir_name, "../../data/train_info_sampled.csv")
 df_sampled.to_csv(sampled_csv_file, index=False)
 
-# Load dataset
-print("Loading dataset...")
-dataset = ImageDataset(sampled_csv_file)
+# Instantiate autoencoder
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+autoencoder = AutoEncoder(encoded_dim=args.encoded_dim).to(device)
 
-# Define sampling strategy
+# Pretrain autoencoder on reconstruction
+ae_dataset = AutoEncoderTrainingDataset(sampled_csv_file, device)
+ae_loader = DataLoader(ae_dataset, batch_size=args.batch_size, shuffle=True)
+ae_criterion = nn.MSELoss()
+ae_optimizer = optim.Adam(autoencoder.parameters(), lr=args.learning_rate)
+pretrain_autoencoder(autoencoder, ae_loader, args.ae_epochs, ae_optimizer, ae_criterion, device)
+
+# Freeze encoder for classification
+for param in autoencoder.encoder.parameters():
+    param.requires_grad = False
+
+# Define classifier model
+class MLPClassifier(nn.Module):
+    def __init__(self, input_dim=128, num_classes=4):
+        super(MLPClassifier, self).__init__()
+        self.net = nn.Sequential(
+            nn.Linear(input_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, num_classes)
+        )
+
+    def forward(self, x):
+        return self.net(x)
+
+# Dataset for classification using frozen encoder
+class AutoEncodedDataset(Dataset):
+    def __init__(self, csv_path, ae_model, device):
+        self.df = pd.read_csv(csv_path)
+        self.ae_model = ae_model.eval()
+        self.device = device
+        self.labeldict = {label: self.df[self.df['label_id'] == label].index.tolist() for label in self.df['label_id'].unique()}
+
+    def __len__(self):
+        return len(self.df)
+
+    def __getitem__(self, idx):
+        row = self.df.iloc[idx]
+        img = Image.open(row['image_path']).convert('RGB')
+        img = transforms.Resize((512, 512))(img)
+        img = transforms.ToTensor()(img).to(self.device)
+        _, compressed = self.ae_model(img.unsqueeze(0))
+        return compressed.view(-1).detach(), torch.tensor(row['label_id'], dtype=torch.long)
+
+# Load dataset and sampler
+dataset = AutoEncodedDataset(sampled_csv_file, autoencoder, device)
 sampler = None
 if args.method == "stratified":
     sampler = StratifiedSampler(dataset, samplePerGroup=100)
@@ -83,32 +152,46 @@ elif args.method == "weighted":
     weights = create_sample_weights(dataset)
     sampler = WeightedRandomSampler(dataset, weights, total_samples=1000, allowRepeat=True)
 
-# Build DataLoader
-if sampler:
-    data_loader = DataLoader(dataset, batch_size=args.batch_size, sampler=sampler)
-else:
-    data_loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
+data_loader = DataLoader(dataset, batch_size=args.batch_size, sampler=sampler) if sampler else \
+              DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
 
-# Select Model
-model_class = BaselineCNN if args.model == "BaselineCNN" else ResNet
-model = model_class(num_classes=4, keep_prob=0.75).to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
-
-# Loss and Optimizer
+# Train classifier
+model = MLPClassifier(input_dim=args.encoded_dim, num_classes=4).to(device)
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
 
-# Training
-print(f"Training with {args.method} using {args.model} model...")
-fit(model, data_loader, args.num_epochs, optimizer, criterion, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+def fit(model, dataloader, num_epochs, optimizer, criterion, device):
+    model.train()
+    for epoch in range(num_epochs):
+        running_loss = 0.0
+        correct = 0
+        total = 0
+        for inputs, labels in dataloader:
+            inputs, labels = inputs.to(device), labels.to(device)
+            optimizer.zero_grad()
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+            running_loss += loss.item() * inputs.size(0)
+            _, predicted = torch.max(outputs.data, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+        epoch_loss = running_loss / total
+        epoch_acc = correct / total
+        print(f"Epoch [{epoch+1}/{num_epochs}] Loss: {epoch_loss:.4f} Accuracy: {epoch_acc:.4f}")
 
-# Evaluation
+print(f"Training classifier with autoencoder compression (dim={args.encoded_dim})...")
+fit(model, data_loader, args.num_epochs, optimizer, criterion, device)
+
+# Evaluate
 print("Evaluating model...")
-test_loss, test_acc = evaluate_model(model, data_loader, criterion, torch.device("cuda" if torch.cuda.is_available() else "cpu"))
-results = {args.method: {"loss": test_loss, "accuracy": test_acc}}
+test_loss, test_acc = evaluate_model(model, data_loader, criterion, device)
+results = {args.method: {"loss": test_loss, "accuracy": test_acc, "compression_dim": args.encoded_dim}}
 
 # Save results
 os.makedirs(args.outdir, exist_ok=True)
-output_path = os.path.join(args.outdir, f"sampling_results_{args.method}.json")
+output_path = os.path.join(args.outdir, f"sampling_results_{args.method}_autoenc_dim{args.encoded_dim}.json")
 with open(output_path, "w") as f:
     json.dump(results, f, indent=4)
 

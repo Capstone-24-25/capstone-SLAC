@@ -1,0 +1,7 @@
+{
+    "stratified": {
+        "loss": 1.3402115106582642,
+        "accuracy": 0.3525,
+        "compression_method": "autoencoder"
+    }
+}

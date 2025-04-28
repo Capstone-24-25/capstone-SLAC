@@ -1,0 +1,7 @@
+{
+    "stratified": {
+        "loss": 1.2904767256516676,
+        "accuracy": 0.3775,
+        "compression_dim": 2048
+    }
+}
