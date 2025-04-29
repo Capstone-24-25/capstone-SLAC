@@ -18,10 +18,10 @@ from SLAC25.utils import split_train_val, evaluate_model, EarlyStopping
 from SLAC25.models import *
 
 class Wrapper:
-    def __init__(self, model, num_epochs=10, outdir='./models', verbose=False, testmode=False):
+    def __init__(self, model, criterion, num_epochs=10, outdir='./models', verbose=False, testmode=False):
         self.model = model
         self.num_epochs = num_epochs
-        self.criterion = nn.CrossEntropyLoss() # internally computes the softmax so no need for it. 
+        self.criterion = criterion
         self.optimizer = optim.Adam(self.model.parameters())
         self.lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', factor=0.1, patience=5, min_lr=1e-6)
         self.EarlyStopping = EarlyStopping(patience=7, verbose=False)
@@ -49,8 +49,9 @@ class ModelWrapper(Wrapper): # inherits from Wrapper class
             #model = model_class(num_classes, keep_prob)
             if verbose:
                 print(f"Instantiating new model with num_classes={num_classes} and keep_prob={keep_prob}")
-        super().__init__(model, num_epochs, outdir, verbose, testmode)
+        super().__init__(model, criterion, num_epochs, outdir, verbose, testmode)
         self.phase = 1
+        self.criterion = criterion
 
 class ModelWrapper(Wrapper):
     def __init__(self, model_class, num_classes=4, keep_prob=0.75, num_epochs=10, outdir='./models', verbose=False, testmode=False):
@@ -105,13 +106,13 @@ class ModelWrapper(Wrapper):
             valSubDataset = Subset(valDataset, list(range(ntest)))
             
             phase1_train_factory = DataLoaderFactory(phase1_trainSubDataset, batch_size, num_workers=nwork)
-            phase2_train_factory = DataLoaderFactory(phase2_trainSubDataset, batch_size, num_workers=nwork)
+            phase2_train_factory = DataLoaderFactory(phase2_trainSubDataset, batch_size//2, num_workers=nwork) # half the batch size since images are larger
             test_factory = DataLoaderFactory(testSubDataset, batch_size, num_workers=nwork)
             val_factory = DataLoaderFactory(valSubDataset, batch_size, num_workers=nwork)
         
         else:
             phase1_train_factory = DataLoaderFactory(phase1_trainDataset, batch_size, num_workers=nwork)
-            phase2_train_factory = DataLoaderFactory(phase2_trainDataset, batch_size, num_workers=nwork)
+            phase2_train_factory = DataLoaderFactory(phase2_trainDataset, batch_size//2, num_workers=nwork)
             test_factory = DataLoaderFactory(testDataset, batch_size, num_workers=nwork)
             val_factory = DataLoaderFactory(valDataset, batch_size, num_workers=nwork)
 
@@ -345,7 +346,8 @@ class ModelWrapper(Wrapper):
         if self.verbose:
             print("\n{:=^70}".format(" Starting Phase 1 Training (224x224) "))
             self.model.print_trainable_parameters()
-        
+
+        torch.backends.cudnn.benchmark = True
         train_log = self.train() # train the model
         # Save the phase 1 weights
         timeNow = datetime.now(pytz.timezone("America/Los_Angeles")).strftime("%Y%m%d%H%M%S")
@@ -358,10 +360,12 @@ class ModelWrapper(Wrapper):
 
     def train_phase2(self, phase1_weights):
         """Train phase 2 with 512x512 images"""
+        torch.backends.cudnn.benchmark = True # new benchmark for phase 2
         self.phase = 2
         
         # Load phase 1 weights and transfer learn phase 2
-        self.model.load_state_dict(torch.load(phase1_weights))
+        state = torch.load(phase1_weights, weights_only=True)
+        self.model.load_state_dict(state)
         self.model.transfer_learn_phase2()
         
         if self.verbose:
