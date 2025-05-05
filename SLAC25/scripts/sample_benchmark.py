@@ -104,6 +104,7 @@ def pretrain_autoencoder(model, dataloader, num_epochs, optimizer, criterion, de
 
 # Add optional argument for AE pretraining
 ap = ArgumentParser()
+ap.add_argument("--sample_frac", type=float, default=0.15, help="Fraction of the dataset to sample")
 ap.add_argument("--method", type=str, choices=["original", "stratified", "equal", "weighted"], help="Sampling method")
 ap.add_argument("--num_epochs", type=int, default=5, help="Number of epochs for training classifier")
 ap.add_argument("--ae_epochs", type=int, default=10, help="Number of epochs for autoencoder pretraining")
@@ -118,9 +119,24 @@ args = ap.parse_args()
 dir_name = os.path.dirname(__file__)
 csv_train_file = os.path.join(dir_name, "../../data/train_info.csv")
 df = pd.read_csv(csv_train_file)
-df_sampled = df.sample(frac=0.05, random_state=42)
+from sklearn.utils import resample
+
+# Sample a user-specified fraction (default 15%)
+df_sampled = df.sample(frac=args.sample_frac, random_state=42)
+
+# Oversample to balance classes
+majority_count = df_sampled['label_id'].value_counts().max()
+balanced_df = pd.concat([
+    resample(g, replace=True, n_samples=majority_count, random_state=42)
+    for _, g in df_sampled.groupby('label_id')
+])
+balanced_df = balanced_df.sample(frac=1.0, random_state=42).reset_index(drop=True)
+
+# Save the oversampled, balanced data
 sampled_csv_file = os.path.join(dir_name, "../../data/train_info_sampled.csv")
-df_sampled.to_csv(sampled_csv_file, index=False)
+balanced_df.to_csv(sampled_csv_file, index=False)
+
+
 
 # Instantiate autoencoder
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
