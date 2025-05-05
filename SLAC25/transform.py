@@ -23,6 +23,12 @@ tfConfig = {
             "kernel_size": 5,
             "sigma": (0.1, 2.0)
         }
+    },
+    "sharpening": {
+        "on": True,
+        "params": {
+            "factor": 2.0
+        }
     }
 }
 
@@ -128,4 +134,12 @@ class TransformV1():
         return v2.RandomVerticalFlip()(img)
       
     return img
+  
+  def _random_sharpening(self, img, idx):
+    """Sharpening the imag with 50% probability"""
+    if self._checkConfig() and self.tf_config["sharpening"]["on"]:
+      if random.random() < 0.5:
+        self._recordTf(idx, "Applying Sharpening")
+        return v2.RandomAdjustSharpness()(img)
     
+    return img

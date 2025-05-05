@@ -5,35 +5,50 @@ import numpy as np
 import random
 import json
 import os
+print("Libraries Imported 1")
 import pandas as pd
 from torchvision import transforms
 from torch.utils.data import Dataset, DataLoader
 from argparse import ArgumentParser
 from PIL import Image
+from torchvision.models.segmentation import fcn_resnet50
 
+# sr --pty ./wrapper.sh 2
 from SLAC25.utils import evaluate_model
 from SLAC25.models import BaselineCNN
 from SLAC25.sampler import StratifiedSampler, WeightedRandomSampler, EqualGroupSampler, create_sample_weights
+print("Libraries Imported 2")
 
-# AutoEncoder for feature compression
+# Convolutional AutoEncoder for feature compression
 class AutoEncoder(nn.Module):
     def __init__(self, encoded_dim):
-        assert 128 <= encoded_dim <= 10000, "encoded_dim must be between 128 and 10,000"
         super(AutoEncoder, self).__init__()
         self.encoder = nn.Sequential(
-            nn.Linear(3 * 512 * 512, 1024),
+            nn.Conv2d(3, 16, kernel_size=3, stride=2, padding=1),   # 512 → 256
             nn.ReLU(True),
-            nn.Linear(1024, encoded_dim)
+            nn.Conv2d(16, 32, kernel_size=3, stride=2, padding=1),  # 256 → 128
+            nn.ReLU(True),
+            nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),  # 128 → 64
+            nn.ReLU(True),
+            nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1), # 64 → 32
+            nn.ReLU(True),
+            nn.Flatten(),
+            nn.Linear(128 * 32 * 32, encoded_dim)
         )
         self.decoder = nn.Sequential(
-            nn.Linear(encoded_dim, 1024),
+            nn.Linear(encoded_dim, 128 * 32 * 32),
+            nn.Unflatten(1, (128, 32, 32)),
+            nn.ConvTranspose2d(128, 64, kernel_size=3, stride=2, padding=1, output_padding=1),
             nn.ReLU(True),
-            nn.Linear(1024, 3 * 512 * 512),
+            nn.ConvTranspose2d(64, 32, kernel_size=3, stride=2, padding=1, output_padding=1),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(32, 16, kernel_size=3, stride=2, padding=1, output_padding=1),
+            nn.ReLU(True),
+            nn.ConvTranspose2d(16, 3, kernel_size=3, stride=2, padding=1, output_padding=1),
             nn.Sigmoid()
         )
 
     def forward(self, x):
-        x = x.view(x.size(0), -1)
         z = self.encoder(x)
         x_hat = self.decoder(z)
         return x_hat, z
@@ -53,15 +68,17 @@ class AutoEncoderTrainingDataset(Dataset):
         img = Image.open(image_path).convert('RGB')
         img = transforms.Resize((512, 512))(img)
         img = transforms.ToTensor()(img).to(self.device)
-        return img.view(-1), img.view(-1)
+        return img, img
+
 
 # Training loop for autoencoder
-def pretrain_autoencoder(model, dataloader, num_epochs, optimizer, criterion, device):
+def pretrain_autoencoder(model, dataloader, num_epochs, optimizer, criterion, device, test_dataloader=None):
     print("Pretraining autoencoder...")
-    model.train()
     for epoch in range(num_epochs):
+        model.train()
         running_loss = 0.0
-        for inputs, targets in dataloader:
+        for ii, (inputs, targets) in enumerate(dataloader):
+            print("here", ii)
             inputs, targets = inputs.to(device), targets.to(device)
 
             optimizer.zero_grad()
@@ -72,7 +89,18 @@ def pretrain_autoencoder(model, dataloader, num_epochs, optimizer, criterion, de
 
             running_loss += loss.item() * inputs.size(0)
         epoch_loss = running_loss / len(dataloader.dataset)
-        print(f"[AutoEncoder Epoch {epoch+1}] Loss: {epoch_loss:.4f}")
+        print(f"[AutoEncoder Epoch {epoch+1}] Train Loss: {epoch_loss:.4f}")
+        if test_dataloader is not None:
+            model.eval()
+            test_running_loss = 0
+            with torch.no_grad():
+                for inputs, targets in test_dataloader:
+                    inputs, targets = inputs.to(device), targets.to(device)
+                    outputs, _ = model(inputs)
+                    loss = criterion(outputs, targets)
+                    test_running_loss += loss.item() * inputs.size(0)
+            test_epoch_loss = test_running_loss / len(test_dataloader.dataset)
+            print(f"[AutoEncoder Epoch {epoch+1}] Test Loss: {test_epoch_loss:.4f}")
 
 # Add optional argument for AE pretraining
 ap = ArgumentParser()
@@ -100,10 +128,19 @@ autoencoder = AutoEncoder(encoded_dim=args.encoded_dim).to(device)
 
 # Pretrain autoencoder on reconstruction
 ae_dataset = AutoEncoderTrainingDataset(sampled_csv_file, device)
-ae_loader = DataLoader(ae_dataset, batch_size=args.batch_size, shuffle=True)
+n_tot = len(ae_dataset)
+ntrain = int(0.9*n_tot)
+ntest = n_tot-ntrain
+
+from torch.utils.data import random_split
+train_dset, test_dset =random_split(ae_dataset,[ntrain, ntest] )
+
+train_loader = DataLoader(train_dset, batch_size=args.batch_size, shuffle=True)
+test_loader = DataLoader(test_dset, batch_size=args.batch_size, shuffle=False)
+
 ae_criterion = nn.MSELoss()
 ae_optimizer = optim.Adam(autoencoder.parameters(), lr=args.learning_rate)
-pretrain_autoencoder(autoencoder, ae_loader, args.ae_epochs, ae_optimizer, ae_criterion, device)
+pretrain_autoencoder(autoencoder, train_loader, args.ae_epochs, ae_optimizer, ae_criterion, device, test_dataloader=test_loader)
 
 # Freeze encoder for classification
 for param in autoencoder.encoder.parameters():

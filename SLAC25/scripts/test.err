@@ -1,0 +1,8 @@
+usage: sample_benchmark.py [-h]
+                           [--method {original,stratified,equal,weighted}]
+                           [--num_epochs NUM_EPOCHS] [--ae_epochs AE_EPOCHS]
+                           [--learning_rate LEARNING_RATE]
+                           [--batch_size BATCH_SIZE]
+                           [--encoded_dim ENCODED_DIM] [--outdir OUTDIR]
+                           [--verbose]
+sample_benchmark.py: error: unrecognized arguments: --encoded_sim 2048

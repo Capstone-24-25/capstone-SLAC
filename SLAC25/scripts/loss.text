@@ -1,0 +1,299 @@
+[AutoEncoder Epoch 1] Train Loss: 0.0137
+[AutoEncoder Epoch 1] Test Loss: 0.0060
+--
+[AutoEncoder Epoch 2] Train Loss: 0.0047
+[AutoEncoder Epoch 2] Test Loss: 0.0045
+--
+[AutoEncoder Epoch 3] Train Loss: 0.0033
+[AutoEncoder Epoch 3] Test Loss: 0.0029
+--
+[AutoEncoder Epoch 4] Train Loss: 0.0026
+[AutoEncoder Epoch 4] Test Loss: 0.0025
+--
+[AutoEncoder Epoch 5] Train Loss: 0.0022
+[AutoEncoder Epoch 5] Test Loss: 0.0023
+--
+[AutoEncoder Epoch 6] Train Loss: 0.0020
+[AutoEncoder Epoch 6] Test Loss: 0.0020
+--
+[AutoEncoder Epoch 7] Train Loss: 0.0018
+[AutoEncoder Epoch 7] Test Loss: 0.0020
+--
+[AutoEncoder Epoch 8] Train Loss: 0.0016
+[AutoEncoder Epoch 8] Test Loss: 0.0017
+--
+[AutoEncoder Epoch 9] Train Loss: 0.0015
+[AutoEncoder Epoch 9] Test Loss: 0.0016
+--
+[AutoEncoder Epoch 10] Train Loss: 0.0014
+[AutoEncoder Epoch 10] Test Loss: 0.0017
+--
+[AutoEncoder Epoch 11] Train Loss: 0.0013
+[AutoEncoder Epoch 11] Test Loss: 0.0015
+--
+[AutoEncoder Epoch 12] Train Loss: 0.0012
+[AutoEncoder Epoch 12] Test Loss: 0.0014
+--
+[AutoEncoder Epoch 13] Train Loss: 0.0011
+[AutoEncoder Epoch 13] Test Loss: 0.0014
+--
+[AutoEncoder Epoch 14] Train Loss: 0.0011
+[AutoEncoder Epoch 14] Test Loss: 0.0013
+--
+[AutoEncoder Epoch 15] Train Loss: 0.0010
+[AutoEncoder Epoch 15] Test Loss: 0.0013
+--
+[AutoEncoder Epoch 16] Train Loss: 0.0010
+[AutoEncoder Epoch 16] Test Loss: 0.0013
+--
+[AutoEncoder Epoch 17] Train Loss: 0.0009
+[AutoEncoder Epoch 17] Test Loss: 0.0012
+--
+[AutoEncoder Epoch 18] Train Loss: 0.0009
+[AutoEncoder Epoch 18] Test Loss: 0.0012
+--
+[AutoEncoder Epoch 19] Train Loss: 0.0009
+[AutoEncoder Epoch 19] Test Loss: 0.0012
+--
+[AutoEncoder Epoch 20] Train Loss: 0.0008
+[AutoEncoder Epoch 20] Test Loss: 0.0011
+--
+[AutoEncoder Epoch 21] Train Loss: 0.0008
+[AutoEncoder Epoch 21] Test Loss: 0.0012
+--
+[AutoEncoder Epoch 22] Train Loss: 0.0008
+[AutoEncoder Epoch 22] Test Loss: 0.0011
+--
+[AutoEncoder Epoch 23] Train Loss: 0.0007
+[AutoEncoder Epoch 23] Test Loss: 0.0011
+--
+[AutoEncoder Epoch 24] Train Loss: 0.0007
+[AutoEncoder Epoch 24] Test Loss: 0.0011
+--
+[AutoEncoder Epoch 25] Train Loss: 0.0007
+[AutoEncoder Epoch 25] Test Loss: 0.0011
+--
+[AutoEncoder Epoch 26] Train Loss: 0.0007
+[AutoEncoder Epoch 26] Test Loss: 0.0010
+--
+[AutoEncoder Epoch 27] Train Loss: 0.0007
+[AutoEncoder Epoch 27] Test Loss: 0.0011
+--
+[AutoEncoder Epoch 28] Train Loss: 0.0007
+[AutoEncoder Epoch 28] Test Loss: 0.0011
+--
+[AutoEncoder Epoch 29] Train Loss: 0.0006
+[AutoEncoder Epoch 29] Test Loss: 0.0010
+--
+[AutoEncoder Epoch 30] Train Loss: 0.0006
+[AutoEncoder Epoch 30] Test Loss: 0.0010
+--
+[AutoEncoder Epoch 31] Train Loss: 0.0006
+[AutoEncoder Epoch 31] Test Loss: 0.0010
+--
+[AutoEncoder Epoch 32] Train Loss: 0.0006
+[AutoEncoder Epoch 32] Test Loss: 0.0011
+--
+[AutoEncoder Epoch 33] Train Loss: 0.0006
+[AutoEncoder Epoch 33] Test Loss: 0.0010
+--
+[AutoEncoder Epoch 34] Train Loss: 0.0006
+[AutoEncoder Epoch 34] Test Loss: 0.0010
+--
+[AutoEncoder Epoch 35] Train Loss: 0.0006
+[AutoEncoder Epoch 35] Test Loss: 0.0010
+--
+[AutoEncoder Epoch 36] Train Loss: 0.0006
+[AutoEncoder Epoch 36] Test Loss: 0.0010
+--
+[AutoEncoder Epoch 37] Train Loss: 0.0006
+[AutoEncoder Epoch 37] Test Loss: 0.0010
+--
+[AutoEncoder Epoch 38] Train Loss: 0.0005
+[AutoEncoder Epoch 38] Test Loss: 0.0010
+--
+[AutoEncoder Epoch 39] Train Loss: 0.0005
+[AutoEncoder Epoch 39] Test Loss: 0.0009
+--
+[AutoEncoder Epoch 40] Train Loss: 0.0005
+[AutoEncoder Epoch 40] Test Loss: 0.0010
+--
+[AutoEncoder Epoch 41] Train Loss: 0.0005
+[AutoEncoder Epoch 41] Test Loss: 0.0010
+--
+[AutoEncoder Epoch 42] Train Loss: 0.0005
+[AutoEncoder Epoch 42] Test Loss: 0.0010
+--
+[AutoEncoder Epoch 43] Train Loss: 0.0005
+[AutoEncoder Epoch 43] Test Loss: 0.0009
+--
+[AutoEncoder Epoch 44] Train Loss: 0.0005
+[AutoEncoder Epoch 44] Test Loss: 0.0010
+--
+[AutoEncoder Epoch 45] Train Loss: 0.0005
+[AutoEncoder Epoch 45] Test Loss: 0.0009
+--
+[AutoEncoder Epoch 46] Train Loss: 0.0005
+[AutoEncoder Epoch 46] Test Loss: 0.0009
+--
+[AutoEncoder Epoch 47] Train Loss: 0.0005
+[AutoEncoder Epoch 47] Test Loss: 0.0009
+--
+[AutoEncoder Epoch 48] Train Loss: 0.0005
+[AutoEncoder Epoch 48] Test Loss: 0.0009
+--
+[AutoEncoder Epoch 49] Train Loss: 0.0005
+[AutoEncoder Epoch 49] Test Loss: 0.0009
+--
+[AutoEncoder Epoch 50] Train Loss: 0.0005
+[AutoEncoder Epoch 50] Test Loss: 0.0009
+--
+[AutoEncoder Epoch 51] Train Loss: 0.0005
+[AutoEncoder Epoch 51] Test Loss: 0.0009
+--
+[AutoEncoder Epoch 52] Train Loss: 0.0004
+[AutoEncoder Epoch 52] Test Loss: 0.0009
+--
+[AutoEncoder Epoch 53] Train Loss: 0.0005
+[AutoEncoder Epoch 53] Test Loss: 0.0009
+--
+[AutoEncoder Epoch 54] Train Loss: 0.0004
+[AutoEncoder Epoch 54] Test Loss: 0.0009
+--
+[AutoEncoder Epoch 55] Train Loss: 0.0004
+[AutoEncoder Epoch 55] Test Loss: 0.0009
+--
+[AutoEncoder Epoch 56] Train Loss: 0.0004
+[AutoEncoder Epoch 56] Test Loss: 0.0009
+--
+[AutoEncoder Epoch 57] Train Loss: 0.0004
+[AutoEncoder Epoch 57] Test Loss: 0.0009
+--
+[AutoEncoder Epoch 58] Train Loss: 0.0004
+[AutoEncoder Epoch 58] Test Loss: 0.0009
+--
+[AutoEncoder Epoch 59] Train Loss: 0.0004
+[AutoEncoder Epoch 59] Test Loss: 0.0010
+--
+[AutoEncoder Epoch 60] Train Loss: 0.0004
+[AutoEncoder Epoch 60] Test Loss: 0.0009
+--
+[AutoEncoder Epoch 61] Train Loss: 0.0004
+[AutoEncoder Epoch 61] Test Loss: 0.0009
+--
+[AutoEncoder Epoch 62] Train Loss: 0.0004
+[AutoEncoder Epoch 62] Test Loss: 0.0009
+--
+[AutoEncoder Epoch 63] Train Loss: 0.0004
+[AutoEncoder Epoch 63] Test Loss: 0.0009
+--
+[AutoEncoder Epoch 64] Train Loss: 0.0004
+[AutoEncoder Epoch 64] Test Loss: 0.0009
+--
+[AutoEncoder Epoch 65] Train Loss: 0.0004
+[AutoEncoder Epoch 65] Test Loss: 0.0009
+--
+[AutoEncoder Epoch 66] Train Loss: 0.0004
+[AutoEncoder Epoch 66] Test Loss: 0.0009
+--
+[AutoEncoder Epoch 67] Train Loss: 0.0004
+[AutoEncoder Epoch 67] Test Loss: 0.0009
+--
+[AutoEncoder Epoch 68] Train Loss: 0.0004
+[AutoEncoder Epoch 68] Test Loss: 0.0009
+--
+[AutoEncoder Epoch 69] Train Loss: 0.0004
+[AutoEncoder Epoch 69] Test Loss: 0.0009
+--
+[AutoEncoder Epoch 70] Train Loss: 0.0004
+[AutoEncoder Epoch 70] Test Loss: 0.0010
+--
+[AutoEncoder Epoch 71] Train Loss: 0.0004
+[AutoEncoder Epoch 71] Test Loss: 0.0009
+--
+[AutoEncoder Epoch 72] Train Loss: 0.0004
+[AutoEncoder Epoch 72] Test Loss: 0.0008
+--
+[AutoEncoder Epoch 73] Train Loss: 0.0004
+[AutoEncoder Epoch 73] Test Loss: 0.0009
+--
+[AutoEncoder Epoch 74] Train Loss: 0.0004
+[AutoEncoder Epoch 74] Test Loss: 0.0009
+--
+[AutoEncoder Epoch 75] Train Loss: 0.0004
+[AutoEncoder Epoch 75] Test Loss: 0.0009
+--
+[AutoEncoder Epoch 76] Train Loss: 0.0004
+[AutoEncoder Epoch 76] Test Loss: 0.0009
+--
+[AutoEncoder Epoch 77] Train Loss: 0.0004
+[AutoEncoder Epoch 77] Test Loss: 0.0008
+--
+[AutoEncoder Epoch 78] Train Loss: 0.0004
+[AutoEncoder Epoch 78] Test Loss: 0.0009
+--
+[AutoEncoder Epoch 79] Train Loss: 0.0004
+[AutoEncoder Epoch 79] Test Loss: 0.0008
+--
+[AutoEncoder Epoch 80] Train Loss: 0.0004
+[AutoEncoder Epoch 80] Test Loss: 0.0009
+--
+[AutoEncoder Epoch 81] Train Loss: 0.0004
+[AutoEncoder Epoch 81] Test Loss: 0.0008
+--
+[AutoEncoder Epoch 82] Train Loss: 0.0004
+[AutoEncoder Epoch 82] Test Loss: 0.0008
+--
+[AutoEncoder Epoch 83] Train Loss: 0.0004
+[AutoEncoder Epoch 83] Test Loss: 0.0009
+--
+[AutoEncoder Epoch 84] Train Loss: 0.0004
+[AutoEncoder Epoch 84] Test Loss: 0.0008
+--
+[AutoEncoder Epoch 85] Train Loss: 0.0003
+[AutoEncoder Epoch 85] Test Loss: 0.0008
+--
+[AutoEncoder Epoch 86] Train Loss: 0.0003
+[AutoEncoder Epoch 86] Test Loss: 0.0009
+--
+[AutoEncoder Epoch 87] Train Loss: 0.0003
+[AutoEncoder Epoch 87] Test Loss: 0.0009
+--
+[AutoEncoder Epoch 88] Train Loss: 0.0003
+[AutoEncoder Epoch 88] Test Loss: 0.0009
+--
+[AutoEncoder Epoch 89] Train Loss: 0.0003
+[AutoEncoder Epoch 89] Test Loss: 0.0008
+--
+[AutoEncoder Epoch 90] Train Loss: 0.0003
+[AutoEncoder Epoch 90] Test Loss: 0.0009
+--
+[AutoEncoder Epoch 91] Train Loss: 0.0003
+[AutoEncoder Epoch 91] Test Loss: 0.0008
+--
+[AutoEncoder Epoch 92] Train Loss: 0.0003
+[AutoEncoder Epoch 92] Test Loss: 0.0010
+--
+[AutoEncoder Epoch 93] Train Loss: 0.0003
+[AutoEncoder Epoch 93] Test Loss: 0.0009
+--
+[AutoEncoder Epoch 94] Train Loss: 0.0003
+[AutoEncoder Epoch 94] Test Loss: 0.0008
+--
+[AutoEncoder Epoch 95] Train Loss: 0.0003
+[AutoEncoder Epoch 95] Test Loss: 0.0008
+--
+[AutoEncoder Epoch 96] Train Loss: 0.0003
+[AutoEncoder Epoch 96] Test Loss: 0.0008
+--
+[AutoEncoder Epoch 97] Train Loss: 0.0003
+[AutoEncoder Epoch 97] Test Loss: 0.0008
+--
+[AutoEncoder Epoch 98] Train Loss: 0.0003
+[AutoEncoder Epoch 98] Test Loss: 0.0008
+--
+[AutoEncoder Epoch 99] Train Loss: 0.0003
+[AutoEncoder Epoch 99] Test Loss: 0.0008
+--
+[AutoEncoder Epoch 100] Train Loss: 0.0003
+[AutoEncoder Epoch 100] Test Loss: 0.0008
