@@ -6,11 +6,12 @@ import numpy as np
 import os
 import json
 import matplotlib.pyplot as plt
-
+from models import *
 
 def evaluate_model(model, dataloader, criterion, device):
     """
-    Evaluation helper function for a model to evaluate on a dataset
+    Evaluation helper function for a model to evaluate on a dataset.
+    Handles both standard models and VAE models.
     """
     model.eval()
     running_loss = 0.0
@@ -20,16 +21,17 @@ def evaluate_model(model, dataloader, criterion, device):
     with torch.no_grad():
         for images, labels in dataloader:
             images, labels = images.to(device), labels.to(device)
+            # For standard classification models
             outputs = model(images)
             loss = criterion(outputs, labels)
-            running_loss += loss.item()
             _, predicted = outputs.max(1)
-            
             total += labels.size(0)
             correct += predicted.eq(labels).sum().item()
+        
+            running_loss += loss.item()
 
     test_loss = running_loss / len(dataloader)
-    test_acc = correct / total
+    test_acc = correct / total if total > 0 else 0
 
     return test_loss, test_acc
 
@@ -107,7 +109,7 @@ class EarlyStopping:
         self.val_loss_min = val_loss
 
 # create a function for visualizing the performance of the model via train log from the json file
-def visualize_performance(train_log, out_dir: str, file_name: str) -> None:
+def visualize_performance(train_log, out_dir: str, file_name: str, is_vae: bool = False) -> None:
     '''
     Visualize the performance of the model via train log from the json file
     Args:
@@ -123,54 +125,119 @@ def visualize_performance(train_log, out_dir: str, file_name: str) -> None:
     epochs = train_log['epoch']
     train_loss = train_log['train_loss']
     val_loss = train_log['val_loss']
-    train_acc = train_log['train_acc']
-    val_acc = train_log['val_acc']
+    #train_acc = None if is_vae else train_log['train_acc']
+    #val_acc = None if is_vae else train_log['val_acc']
     test_loss = train_log['test_loss']
-    test_acc = train_log['test_acc']
-
-    # Check if validation data is all zeros
-    if all(v == 0 for v in val_loss):
-        print("Warning: Validation loss data is all zeros.")
-        val_loss = None
-
-    if all(v == 0 for v in val_acc):
-        print("Warning: Validation accuracy data is all zeros.")
-        val_acc = None
-
-    if all(v == 0 for v in test_loss):
-        print("Warning: Test loss data is all zeros.")
-        test_loss = None
-
-    if all(v == 0 for v in test_acc):
-        print("Warning: Test accuracy data is all zeros.")
-        test_acc = None
+    #test_acc = None if is_vae else train_log['test_acc']
 
     # plotting
-    fig, axs = plt.subplots(1, 2, figsize=(15, 5))
+    if is_vae:
+        plt.figure(figsize=(10, 5))
+        plt.plot(epochs, train_loss, label='Training Loss')
+        plt.plot(epochs, val_loss, label='Validation Loss')
+        plt.plot(epochs, test_loss, label='Test Loss')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.legend(loc='best')
+        plt.savefig(out_dir + '/' + file_name)
+        plt.close()
+    else:
+        # Check if validation data is all zeros
+        if all(v == 0 for v in val_loss):
+            print("Warning: Validation loss data is all zeros.")
+            val_loss = None
 
-    axs[0].plot(epochs, train_loss, label='Training Loss')
-    if val_loss is not None:
-        axs[0].plot(epochs, val_loss, label='Validation Loss')
-    if test_loss is not None:
-        axs[0].plot(epochs, test_loss, label='Test Loss')
-    axs[0].set_xlabel('Epoch')
-    axs[0].set_ylabel('Loss')
-    axs[0].legend()
+        '''if all(v == 0 for v in val_acc):
+            print("Warning: Validation accuracy data is all zeros.")
+            val_acc = None'''
 
-    axs[1].plot(epochs, train_acc, label='Training Accuracy')
-    if val_acc is not None:
-        axs[1].plot(epochs, val_acc, label='Validation Accuracy')
-    if test_acc is not None:
-        axs[1].plot(epochs, test_acc, label='Test Accuracy')
-    axs[1].set_xlabel('Epoch')
-    axs[1].set_ylabel('Accuracy')
-    axs[1].legend()
+        if all(v == 0 for v in test_loss):
+            print("Warning: Test loss data is all zeros.")
+            test_loss = None
 
+        '''if all(v == 0 for v in test_acc):
+            print("Warning: Test accuracy data is all zeros.")
+            test_acc = None'''
+        fig, axs = plt.subplots(1, 2, figsize=(15, 5))
+
+        axs[0].plot(epochs, train_loss, label='Training Loss')
+        if val_loss is not None:
+            axs[0].plot(epochs, val_loss, label='Validation Loss')
+        if test_loss is not None:
+            axs[0].plot(epochs, test_loss, label='Test Loss')
+        axs[0].set_xlabel('Epoch')
+        axs[0].set_ylabel('Loss')
+        axs[0].legend(loc='best')
+
+        #axs[1].plot(epochs, train_acc, label='Training Accuracy')
+        #if val_acc is not None:
+        #    axs[1].plot(epochs, val_acc, label='Validation Accuracy')
+        #if test_acc is not None:
+        #    axs[1].plot(epochs, test_acc, label='Test Accuracy')
+        axs[1].set_xlabel('Epoch')
+        axs[1].set_ylabel('Accuracy')
+        axs[1].legend(loc='best')
+
+    #plt.tight_layout()
+    #plt.savefig(out_dir + '/' + file_name)
+    #plt.close()
+
+    print(f"Performance plot saved to {out_dir}/{file_name}.png")
+
+
+
+def visualize_reconstruction(model, dataloader, device, outdir, num_samples=5, save_fig=True, testmode=False):
+    '''
+    Visualize the reconstruction of the model
+    '''
+    model.eval()
+    
+    # get a batch of images
+    images, labels = next(iter(dataloader))
+    images = images.to(device)
+
+    with torch.no_grad():
+        reconstructed, _, _ = model(images)
+
+    # select a subset of images to visualize
+    if testmode:
+        num_samples = 1
+
+    num_samples = min(num_samples, len(images))
+    images = images[:num_samples]
+    reconstructed = reconstructed[:num_samples]
+    labels = labels[:num_samples]
+
+    # convert to cpu and numpy
+    images = images.cpu().numpy()
+    reconstructed = reconstructed.cpu().numpy()
+
+    # plot the original and reconstructed images
+    fig, axs = plt.subplots(2, num_samples, figsize=(num_samples*3, 10))
+
+    # Plot original images on top row
+    for i, ax in enumerate(axes[0]):
+        img = np.transpose(images[i], (1, 2, 0))  # Change from (C,H,W) to (H,W,C)
+        ax.imshow(img)
+        ax.set_title(f"Original\nLabel: {labels[i].item()}")
+        ax.axis('off')
+    
+    # Plot reconstructed images on bottom row
+    for i, ax in enumerate(axes[1]):
+        recon = np.transpose(reconstructed[i], (1, 2, 0))  # Change from (C,H,W) to (H,W,C)
+        ax.imshow(recon)
+        ax.set_title("Reconstructed")
+        ax.axis('off')
+    
     plt.tight_layout()
-    plt.savefig(out_dir + '/' + file_name)
-    plt.close()
-
-    print(f"Performance plot saved to {out_dir}/performance_plot.png")
+    
+    # Save the figure if requested
+    if save_fig:
+        fig_path = os.path.join(outdir, "vae_reconstructions.png")
+        plt.savefig(fig_path)
+        print(f"Reconstructions saved to {fig_path}")
+    
+    return fig
 
 if __name__ == "__main__":
     package_root = os.path.dirname(os.path.abspath(__file__))

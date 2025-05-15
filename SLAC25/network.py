@@ -18,10 +18,9 @@ from SLAC25.utils import split_train_val, evaluate_model, EarlyStopping
 from SLAC25.models import *
 
 class Wrapper:
-    def __init__(self, model, criterion, num_epochs=10, outdir='./models', verbose=False, testmode=False):
+    def __init__(self, model, num_epochs=10, outdir='./models', verbose=False, testmode=False):
         self.model = model
         self.num_epochs = num_epochs
-        self.criterion = criterion
         self.optimizer = optim.Adam(self.model.parameters())
         self.lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', factor=0.1, patience=5, min_lr=1e-6)
         self.EarlyStopping = EarlyStopping(patience=7, verbose=False)
@@ -30,33 +29,30 @@ class Wrapper:
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model.to(self.device)  # Move model to device
         self.testmode = testmode
-
-
-
-class ModelWrapper(Wrapper): # inherits from Wrapper class
-    def __init__(self, model_class, num_classes=4, keep_prob=0.75, num_epochs=10, outdir='./models', verbose=False, testmode=False):
-        # check first if the model_class is already an instantiated model
+        
+class ModelWrapper(Wrapper):
+    def __init__(self, model_class, num_classes=4, keep_prob=0.75, num_epochs=10, 
+                 outdir='./models', verbose=False, testmode=False):
+        # Handle the model instantiation
         if isinstance(model_class, nn.Module):
             model = model_class
             if verbose:
                 print("Using pre-instantiated model. num_classes and keep_prob are ignored.\n")
         else:
             if isinstance(model_class, str):
-              if model_class=="BaselineCNN":
-                 model_class = BaselineCNN
+                if model_class == "BaselineCNN":
+                    model_class = BaselineCNN
             model = model_class(num_classes, keep_prob)
-
-            #model = model_class(num_classes, keep_prob)
             if verbose:
                 print(f"Instantiating new model with num_classes={num_classes} and keep_prob={keep_prob}")
-        super().__init__(model, criterion, num_epochs, outdir, verbose, testmode)
-        self.phase = 1
-        self.criterion = criterion
 
-class ModelWrapper(Wrapper):
-    def __init__(self, model_class, num_classes=4, keep_prob=0.75, num_epochs=10, outdir='./models', verbose=False, testmode=False):
-        super().__init__(model_class, num_epochs, outdir, verbose, testmode)
-        self.phase = 1  # Add this to track which training phase we're in
+        if isinstance(model, VAE):
+            self.criterion = lambda outputs, inputs, mean, logvar: model.loss_function(outputs, inputs, mean, logvar)
+        else:
+            self.criterion = nn.CrossEntropyLoss()
+
+        # Initialize the parent class
+        super().__init__(model, num_epochs, outdir, verbose, testmode)
 
     def _prepareDataLoader(self, batch_size=32, testmode=False, max_imgs=None, nwork=0):
         """Prepare data loaders for both phases using the same image set"""
@@ -77,21 +73,24 @@ class ModelWrapper(Wrapper):
             valDataPath = os.path.abspath(valDataPath)
 
         # Create datasets with different image sizes but same data
-        phase1_trainDataset = ImageDataset(trainDataPath, image_size=224)  # Phase 1 size
-        phase2_trainDataset = ImageDataset(trainDataPath, image_size=512)  # Phase 2 size
+        #phase1_trainDataset = ImageDataset(trainDataPath, image_size=224)  # Phase 1 size
+        #phase2_trainDataset = ImageDataset(trainDataPath, image_size=512)  # Phase 2 size
+        trainDataset = ImageDataset(trainDataPath, image_size=512)
         testDataset = ImageDataset(testDataPath, image_size=512)
         valDataset = ImageDataset(valDataPath, image_size=512)
 
         if testmode:
             # Use the same indices for both phases in test mode
             indices = list(range(50))
-            phase1_trainSubDataset = Subset(phase1_trainDataset, indices)
-            phase2_trainSubDataset = Subset(phase2_trainDataset, indices)
+            #phase1_trainSubDataset = Subset(phase1_trainDataset, indices)
+            #phase2_trainSubDataset = Subset(phase2_trainDataset, indices)
+            trainSubDataset = Subset(trainDataset, indices)
             testSubDataset = Subset(testDataset, list(range(10)))
             valSubDataset = Subset(valDataset, list(range(10)))
             
-            phase1_train_factory = DataLoaderFactory(phase1_trainSubDataset, batch_size=5)
-            phase2_train_factory = DataLoaderFactory(phase2_trainSubDataset, batch_size=5)
+            #phase1_train_factory = DataLoaderFactory(phase1_trainSubDataset, batch_size=5)
+            #phase2_train_factory = DataLoaderFactory(phase2_trainSubDataset, batch_size=5)
+            train_factory = DataLoaderFactory(trainSubDataset, batch_size=5)
             test_factory = DataLoaderFactory(testSubDataset, batch_size=5)
             val_factory = DataLoaderFactory(valSubDataset, batch_size=5)
         
@@ -100,36 +99,41 @@ class ModelWrapper(Wrapper):
             ntest = max_imgs-ntrain
             # Use the same indices for both phases
             indices = list(range(ntrain))
-            phase1_trainSubDataset = Subset(phase1_trainDataset, indices)
-            phase2_trainSubDataset = Subset(phase2_trainDataset, indices)
+            trainSubDataset = Subset(trainDataset, indices)
+            #phase1_trainSubDataset = Subset(phase1_trainDataset, indices)
+            #phase2_trainSubDataset = Subset(phase2_trainDataset, indices)
             testSubDataset = Subset(testDataset, list(range(ntest)))
             valSubDataset = Subset(valDataset, list(range(ntest)))
             
-            phase1_train_factory = DataLoaderFactory(phase1_trainSubDataset, batch_size, num_workers=nwork)
-            phase2_train_factory = DataLoaderFactory(phase2_trainSubDataset, batch_size//2, num_workers=nwork) # half the batch size since images are larger
+            #phase1_train_factory = DataLoaderFactory(phase1_trainSubDataset, batch_size, num_workers=nwork)
+            #phase2_train_factory = DataLoaderFactory(phase2_trainSubDataset, batch_size//2, num_workers=nwork) # half the batch size since images are larger
+            train_factory = DataLoaderFactory(trainSubDataset, batch_size, num_workers=nwork)
             test_factory = DataLoaderFactory(testSubDataset, batch_size, num_workers=nwork)
             val_factory = DataLoaderFactory(valSubDataset, batch_size, num_workers=nwork)
         
         else:
-            phase1_train_factory = DataLoaderFactory(phase1_trainDataset, batch_size, num_workers=nwork)
-            phase2_train_factory = DataLoaderFactory(phase2_trainDataset, batch_size//2, num_workers=nwork)
+            #phase1_train_factory = DataLoaderFactory(phase1_trainDataset, batch_size, num_workers=nwork)
+            #phase2_train_factory = DataLoaderFactory(phase2_trainDataset, batch_size//2, num_workers=nwork)
+            train_factory = DataLoaderFactory(trainDataset, batch_size, num_workers=nwork)
             test_factory = DataLoaderFactory(testDataset, batch_size, num_workers=nwork)
             val_factory = DataLoaderFactory(valDataset, batch_size, num_workers=nwork)
 
         # Set sequential samplers
-        phase1_train_factory.setSequentialSampler()
-        phase2_train_factory.setSequentialSampler()
+        #phase1_train_factory.setSequentialSampler()
+        #phase2_train_factory.setSequentialSampler()
+        train_factory.setSequentialSampler()
         test_factory.setSequentialSampler()
         val_factory.setSequentialSampler()
 
         # Create the data loaders
-        self.phase1_train_loader = phase1_train_factory.outputDataLoader()
-        self.phase2_train_loader = phase2_train_factory.outputDataLoader()
+        #self.phase1_train_loader = phase1_train_factory.outputDataLoader()
+        #self.phase2_train_loader = phase2_train_factory.outputDataLoader()
+        self.train_loader = train_factory.outputDataLoader()
         self.test_loader = test_factory.outputDataLoader()
         self.val_loader = val_factory.outputDataLoader()
 
         # Set initial train_loader based on phase
-        self.train_loader = self.phase1_train_loader if self.phase == 1 else self.phase2_train_loader
+        #self.train_loader = self.phase1_train_loader if self.phase == 1 else self.phase2_train_loader
     def summary(self):
         """
         Print a summary of the training setup configuration.
@@ -157,6 +161,153 @@ class ModelWrapper(Wrapper):
         if self.testmode:
             print("{} NOTE: MODEL IS RUNNING IN TEST MODE {}".format('-'*10, '-'*10))
         print('{:#^70}'.format(''))
+
+    def VAE_train(self):
+        """
+        Training loop for a VAE model instead of the standard training loop.
+        VAE training is unsupervised, so we use MSE rather than cross entropy.
+        """
+        if self.verbose:
+            self.summary()
+            print("\n{:=^70}".format(" VAE Training Started "))
+
+        criterion = nn.MSELoss(reduction='mean')
+
+        train_log = {
+            'epoch': [],
+            'train_loss': [],
+            'val_loss': [],
+            'test_loss': [],
+            'learning_rates': [],
+            'model_checkpoints': [],
+            'time_per_epoch': []
+        }
+        
+        min_val_loss = float('inf')
+
+        for epoch in range(self.num_epochs):
+            print("\n{:-^70}".format(f" Epoch {epoch+1}/{self.num_epochs} "))
+            print("Training Phase:")
+            
+            # Training phase
+            self.model.train()
+            running_loss = 0.0
+            start_time = time.time()
+            
+            for batch_idx, (images, _) in enumerate(self.train_loader):
+                images = images.to(self.device)
+                self.optimizer.zero_grad()
+                # forward pass
+                _, x_reconstructed, mean, logvar = self.model(images)
+                KLD = -0.5 * torch.sum(1 + logvar - mean ** 2 - torch.exp(logvar))
+                loss = criterion(x_reconstructed, images) + 0.0001 * KLD
+                loss.backward()
+                self.optimizer.step()
+
+                #update running loss
+                running_loss += loss.item() * images.size(0)
+                
+                if self.verbose and batch_idx % 100 == 0:
+                    progress = f"{batch_idx+1}/{len(self.train_loader)}"
+                    print(f"{batch_idx+1:>10d} {loss.item():>12.4f} {'-':>12} {progress:>12}")
+
+            # Calculate epoch stats
+            epoch_loss = running_loss / len(self.train_loader.dataset)
+            train_log['epoch'].append(epoch + 1)
+            train_log['train_loss'].append(epoch_loss)
+
+            if self.verbose:
+                print("\nTraining Epoch Summary:")
+                print(f"Average Loss: {epoch_loss:.4f}")
+                print("\n{:-^70}".format(" Validation Phase "))
+
+            # Validation phase
+            self.model.eval()
+            val_running_loss = 0.0
+            num_val_samples = 0
+            with torch.no_grad():
+                for images, _ in self.val_loader:
+                    images = images.to(self.device)
+                    _, x_reconstructed, mean, logvar = self.model(images)
+                    KLD = -0.5 * torch.sum(1 + logvar - mean ** 2 - torch.exp(logvar))
+                    loss = criterion(x_reconstructed, images) + 0.0001 * KLD
+                    val_running_loss += loss.item()
+                    num_val_samples += images.size(0)
+
+            val_loss = val_running_loss / num_val_samples
+            train_log['val_loss'].append(val_loss)
+
+            if self.verbose:
+                print(f"Validation Results:")
+                print(f"Average Loss: {val_loss:.4f}")
+                print("\n{:-^70}".format(" Testing Phase "))
+
+            # Testing phase, accuracy is not calculated for VAE
+            test_loss = 0.0
+            num_test_samples = 0
+            with torch.no_grad():
+                for images, _ in self.test_loader:
+                    images = images.to(self.device)
+                    _, x_reconstructed, mean, logvar = self.model(images)
+                    KLD = -0.5 * torch.sum(1 + logvar - mean ** 2 - torch.exp(logvar))
+                    loss = criterion(x_reconstructed, images) + 0.0001 * KLD
+                    test_loss += loss.item()
+                    num_test_samples += images.size(0)
+            test_loss = test_loss / num_test_samples
+            train_log['test_loss'].append(test_loss)
+
+            if self.verbose:
+                print(f"Testing Results:")
+                print(f"Average Loss: {test_loss:.4f}")
+
+            # Update learning rate
+            train_log['learning_rates'].append(self.optimizer.param_groups[0]['lr'])
+            self.lr_scheduler.step(val_loss)
+            
+            # Record time for this epoch
+            end_time = time.time()
+            time_per_epoch = end_time - start_time
+            train_log['time_per_epoch'].append(time_per_epoch)
+
+            # Save model if validation loss improved
+            if val_loss < min_val_loss:
+                # Delete the previous best model file if it exists
+                if train_log['model_checkpoints']:
+                    old_model_file = train_log['model_checkpoints'][-1]
+                    if os.path.exists(old_model_file):
+                        os.remove(old_model_file)
+                        print(f"Old model {old_model_file} deleted.")
+
+                min_val_loss = val_loss
+                timeNow = datetime.now(pytz.timezone("America/Los_Angeles")).strftime("%Y%m%d%H%M%S")
+                model_name = os.path.join(self.outdir, f"VAE_model_{timeNow}_ep{epoch+1}.net")
+                save_file = os.path.abspath(model_name)
+                try:
+                    torch.save({
+                        'epoch': epoch,
+                        'model_state_dict': self.model.state_dict(),
+                        'optimizer_state_dict': self.optimizer.state_dict(),
+                        'train_loss': epoch_loss,
+                        'val_loss': val_loss
+                    }, save_file)
+                    train_log['model_checkpoints'].append(save_file)
+                    print(f"New best model saved to {save_file}")
+                except Exception as e:
+                    print(f"Error saving model: {e}")
+            
+            # Early stopping check
+            if self.EarlyStopping is not None:
+                self.EarlyStopping(val_loss, self.model)
+                if self.EarlyStopping.early_stop:
+                    print("Early stopping")
+                    break
+        
+        # Save the training log
+        log_file = f"{self.outdir}/vae_train_log.json"
+        with open(log_file, "w") as f:
+            json.dump(train_log, f, indent=4)
+        
+        return train_log
     
     def train(self):
         """
@@ -181,6 +332,7 @@ class ModelWrapper(Wrapper):
         if self.testmode:
             self.lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', factor=0.1, patience=1, min_lr=1e-6) # test if reduce lr works
 
+
         # training loop
         for epoch in range(self.num_epochs):
             print("\n{:-^70}".format(f" Epoch {epoch+1}/{self.num_epochs} "))
@@ -195,26 +347,18 @@ class ModelWrapper(Wrapper):
             start_time = time.time()
             nbatch = len(self.train_loader)
 
-            #tall = time.time()
             for batch_idx, (images, labels) in enumerate(self.train_loader):
-                #tbatch = time.time()
-
                 images, labels = images.to(self.device), labels.to(self.device)
                 self.optimizer.zero_grad() # zero the gradients
-                outputs = self.model(images) # forward pass
-                loss = self.criterion(outputs, labels) # compute the loss
+                outputs = self.model(images)  # forward pass for regular models
+                loss = self.criterion(outputs, labels)  # compute the loss
                 loss.backward() # backpropagation
                 self.optimizer.step() # update the weights
                 
-                if loss is None or math.isnan(loss) or math.isinf(loss):
-                    print(f"Error: Loss became undefined or infinite at Epoch: {epoch + 1}/{self.num_epochs} | Batch: {batch_idx + 1}.")
-                    print(f"Stopping training.")
-                    break
-                
                 # Update running stats
-                running_loss += loss.item() # extract the tensor and return a float
-                _, predicted = outputs.max(1) # gets the class with the highest probability
+                running_loss += loss.item() * images.size(0) # extract the tensor and return a float
                 total += labels.size(0)
+                _, predicted = outputs.max(1) # gets the class with the highest probability
                 correct += predicted.eq(labels).sum().item() # if the predicted label equals the actual label, add 1 to the correct
                 #tbatch = time.time()-tbatch
                 #print("Time batch:", tbatch)
@@ -240,20 +384,20 @@ class ModelWrapper(Wrapper):
             # After training phase: Validation phase
             self.model.eval()
             min_val_loss = float('inf')
-            val_running_loss = 0.0  # Separate variable for validation
-            val_correct = 0
-            val_total = 0
+            val_running_loss = 0.0
+            num_val_samples = 0
             with torch.no_grad():
                 for images, labels in self.val_loader:
                     images, labels = images.to(self.device), labels.to(self.device)
                     outputs = self.model(images)
-                    loss = self.criterion(outputs, labels)
+                    loss = self.criterion(outputs, labels)  # compute the loss
                     val_running_loss += loss.item()
+                    num_val_samples += images.size(0)
                     _, predicted = outputs.max(1)
                     val_total += labels.size(0)
                     val_correct += predicted.eq(labels).sum().item()
-
-            val_loss = val_running_loss / len(self.val_loader)
+            
+            val_loss = val_running_loss / num_val_samples
             val_acc = val_correct / val_total
 
             # update the minimum validation loss
@@ -336,47 +480,6 @@ class ModelWrapper(Wrapper):
         # once training has finished, print finished
         if self.verbose:
             print("\n{:=^70}".format(" Training Complete "))
-        return train_log
-    
-    def train_phase1(self):
-        '''train phase 1 with 224x224 images'''
-        self.phase = 1
-        self.model.transfer_learn_phase1() # function to activate the transfer learning for p1
-        self.train_loader = self.phase1_train_loader
-        if self.verbose:
-            print("\n{:=^70}".format(" Starting Phase 1 Training (224x224) "))
-            self.model.print_trainable_parameters()
-
-        torch.backends.cudnn.benchmark = True
-        train_log = self.train() # train the model
-        # Save the phase 1 weights
-        timeNow = datetime.now(pytz.timezone("America/Los_Angeles")).strftime("%Y%m%d%H%M%S")
-        phase1_weights = os.path.join(self.outdir, f"phase1_weights_{timeNow}.pth")
-        torch.save(self.model.state_dict(), phase1_weights)
-        if self.verbose:
-            print(f"Phase 1 weights saved to {phase1_weights}")
-        
-        return train_log, phase1_weights
-
-    def train_phase2(self, phase1_weights):
-        """Train phase 2 with 512x512 images"""
-        torch.backends.cudnn.benchmark = True # new benchmark for phase 2
-        self.phase = 2
-        
-        # Load phase 1 weights and transfer learn phase 2
-        state = torch.load(phase1_weights, weights_only=True)
-        self.model.load_state_dict(state)
-        self.model.transfer_learn_phase2()
-        
-        if self.verbose:
-            print("\n{:=^70}".format(" Starting Phase 2 Training (512x512) "))
-            self.model.print_trainable_parameters()
-        
-        # Reset optimizer and learning rate scheduler for phase 2
-        self.optimizer = optim.Adam(filter(lambda p: p.requires_grad, self.model.parameters()))
-        self.lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', factor=0.1, patience=5, min_lr=1e-6)
-        
-        train_log = self.train()
         return train_log
 
     def test(self):
