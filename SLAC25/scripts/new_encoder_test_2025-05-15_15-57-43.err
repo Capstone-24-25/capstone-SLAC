@@ -1,0 +1,22 @@
+Traceback (most recent call last):
+  File "/home/bdrabeck/capstone-SLAC/SLAC25/scripts/new_encoder.py", line 156, in <module>
+    fit(model, data_loader, args.num_epochs, optimizer, criterion, device)
+  File "/home/bdrabeck/capstone-SLAC/SLAC25/scripts/new_encoder.py", line 140, in fit
+    for inputs, labels in dataloader:
+  File "/scratch/slac/slacforge/envs/slac/lib/python3.11/site-packages/torch/utils/data/dataloader.py", line 701, in __next__
+    data = self._next_data()
+           ^^^^^^^^^^^^^^^^^
+  File "/scratch/slac/slacforge/envs/slac/lib/python3.11/site-packages/torch/utils/data/dataloader.py", line 756, in _next_data
+    index = self._next_index()  # may raise StopIteration
+            ^^^^^^^^^^^^^^^^^^
+  File "/scratch/slac/slacforge/envs/slac/lib/python3.11/site-packages/torch/utils/data/dataloader.py", line 691, in _next_index
+    return next(self._sampler_iter)  # may raise StopIteration
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/slac/slacforge/envs/slac/lib/python3.11/site-packages/torch/utils/data/sampler.py", line 347, in __iter__
+    for idx in self.sampler:
+  File "/home/bdrabeck/capstone-SLAC/SLAC25/sampler.py", line 38, in __iter__
+    sample = random.sample(indices, self.samplePerGroup)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/scratch/slac/slacforge/envs/slac/lib/python3.11/random.py", line 439, in sample
+    raise TypeError("Population must be a sequence.  "
+TypeError: Population must be a sequence.  For dicts or sets, use sorted(d).
