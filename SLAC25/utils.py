@@ -109,7 +109,8 @@ class EarlyStopping:
         self.val_loss_min = val_loss
 
 # create a function for visualizing the performance of the model via train log from the json file
-def visualize_performance(train_log, out_dir: str, file_name: str, is_vae: bool = False) -> None:
+
+def visualize_performance(log_file: str, out_dir: str = None, file_name: str = None, model_name: str = None) -> None:
     '''
     Visualize the performance of the model via train log from the json file
     Args:
@@ -119,70 +120,131 @@ def visualize_performance(train_log, out_dir: str, file_name: str, is_vae: bool 
     '''
 
     # Load the train log from the JSON file
-    train_log = train_log
+    train_log = json.load(open(log_file))
 
     # variables for plotting
     epochs = train_log['epoch']
-    train_loss = train_log['train_loss']
-    val_loss = train_log['val_loss']
-    #train_acc = None if is_vae else train_log['train_acc']
-    #val_acc = None if is_vae else train_log['val_acc']
-    test_loss = train_log['test_loss']
-    #test_acc = None if is_vae else train_log['test_acc']
+    train_acc = train_log.get('train_acc', None)
+    val_acc = train_log.get('val_acc', None)
+    test_acc = train_log.get('test_acc', None)
 
-    # plotting
-    if is_vae:
-        plt.figure(figsize=(10, 5))
-        plt.plot(epochs, train_loss, label='Training Loss')
-        plt.plot(epochs, val_loss, label='Validation Loss')
-        plt.plot(epochs, test_loss, label='Test Loss')
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
-        plt.legend(loc='best')
-        plt.savefig(out_dir + '/' + file_name)
-        plt.close()
+    # Check for zero values in accuracy data
+    if val_acc is not None and all(v == 0 for v in val_acc):
+        print("Warning: Validation accuracy data is all zeros.")
+        val_acc = None
+
+    if test_acc is not None and all(v == 0 for v in test_acc):
+        print("Warning: Test accuracy data is all zeros.")
+        test_acc = None
+    
+    # Set a clean style with light background
+    plt.style.use('seaborn-v0_8-whitegrid')
+    
+    # Set global RC parameters for font weights and sizes
+    plt.rcParams.update({
+        'font.weight': 'bold',
+        'axes.titleweight': 'bold',
+        'axes.labelweight': 'bold',
+        'axes.titlesize': 16,
+        'axes.labelsize': 14,
+        'xtick.labelsize': 14,
+        'ytick.labelsize': 14,
+        'legend.fontsize': 14,
+        'font.size': 14
+    })
+    
+    # Create the figure
+    fig, ax_acc = plt.subplots(1, 1, figsize=(10, 6), dpi=120)
+    
+    # Define professional but eye-catching colors
+    colors = {
+        'train': '#1f77b4',  # blue
+        'val': '#ff7f0e',    # orange
+        'test': '#2ca02c'    # green
+    }
+    
+    # Plot lines with moderate width and distinct markers
+    ax_acc.plot(epochs, train_acc, marker='o', label='Training Accuracy', 
+                lw=2, color=colors['train'], markersize=6, alpha=0.9)
+    
+    if val_acc is not None:
+        ax_acc.plot(epochs, val_acc, marker='s', label='Validation Accuracy', 
+                    lw=2, color=colors['val'], markersize=6, alpha=0.9)
+    
+    if test_acc is not None:
+        ax_acc.plot(epochs, test_acc, marker='^', label='Test Accuracy', 
+                    lw=2, color=colors['test'], markersize=6, alpha=0.9)
+        
+    # Highlight max accuracy points for validation and test
+    if val_acc is not None and test_acc is not None:
+        best_val_idx = val_acc.index(max(val_acc))
+        best_test_idx = test_acc.index(max(test_acc))
+
+        ax_acc.axvline(x=epochs[best_val_idx], color='red', linestyle='--', alpha=0.7, label='Best Val Epoch')
+        ax_acc.axvline(x=epochs[best_test_idx], color='blue', linestyle='--', alpha=0.7, label='Best Test Epoch')
+
+        ax_acc.scatter(epochs[best_val_idx], val_acc[best_val_idx], s=150, 
+                       facecolor='orange', edgecolor=colors['val'], linewidth=2, zorder=10, alpha=0.5)
+        
+        ax_acc.scatter(epochs[best_test_idx], test_acc[best_test_idx], s=150, 
+                       facecolor='green', edgecolor=colors['test'], linewidth=2, zorder=10, alpha=0.5)
+        
+        # Annotation for best test accuracy
+        ax_acc.annotate(f"Best Val: {val_acc[best_val_idx] * 100:.2f}%\nEpoch: {epochs[best_val_idx]}", 
+                        (epochs[best_val_idx], val_acc[best_val_idx]),
+                        xytext=(-125, -100),  # Move text 30 points right and 30 points down
+                        textcoords='offset points',
+                        fontsize=14, fontweight='bold',
+                        arrowprops=dict(arrowstyle="->", connectionstyle="arc3,rad=.2"))
+        
+        ax_acc.annotate(f"Best Test: {test_acc[best_test_idx] * 100:.2f}%\nEpoch: {epochs[best_test_idx]}", 
+                        (epochs[best_test_idx], test_acc[best_test_idx]),
+                        xytext=(-160, -115),  # Move text 30 points right and 30 points down
+                        textcoords='offset points',
+                        fontsize=14, fontweight='bold',
+                        arrowprops=dict(arrowstyle="->", connectionstyle="arc3,rad=.2"))
+    
+    # Fine-tune grid
+    ax_acc.grid(True, linestyle='--', alpha=0.7)
+    
+    # Style the axes and labels
+    ax_acc.set_xlabel('Epoch', fontsize=14, fontweight='bold')
+    ax_acc.set_ylabel('Accuracy', fontsize=14, fontweight='bold')
+    ax_acc.tick_params(axis='both', which='major', labelsize=16, labelweight='bold')
+    
+    # Add a title
+    ax_acc.set_title(f'{model_name} Accuracy', fontsize=16, fontweight='bold', pad=15)
+    
+    # Customize legend
+    legend = ax_acc.legend(loc='upper left', frameon=True, fontsize=16)
+    frame = legend.get_frame()
+    frame.set_alpha(0.8)
+    frame.set_edgecolor('lightgray')
+    
+    # Set y-axis limits with a little padding
+    all_values = train_acc[:]
+    if val_acc is not None: all_values.extend(val_acc)
+    if test_acc is not None: all_values.extend(test_acc)
+    ax_acc.set_ylim([min(all_values)*0.95, max(all_values)*1.03])
+    
+    # Add a subtle border around the plot area
+    for spine in ax_acc.spines.values():
+        spine.set_visible(True)
+        spine.set_color('lightgray')
+    
+    # Adjust wspace
+    plt.subplots_adjust(wspace=0.4)
+    
+    # Save or display
+    if file_name is None:
+        plt.show()
     else:
-        # Check if validation data is all zeros
-        if all(v == 0 for v in val_loss):
-            print("Warning: Validation loss data is all zeros.")
-            val_loss = None
-
-        '''if all(v == 0 for v in val_acc):
-            print("Warning: Validation accuracy data is all zeros.")
-            val_acc = None'''
-
-        if all(v == 0 for v in test_loss):
-            print("Warning: Test loss data is all zeros.")
-            test_loss = None
-
-        '''if all(v == 0 for v in test_acc):
-            print("Warning: Test accuracy data is all zeros.")
-            test_acc = None'''
-        fig, axs = plt.subplots(1, 2, figsize=(15, 5))
-
-        axs[0].plot(epochs, train_loss, label='Training Loss')
-        if val_loss is not None:
-            axs[0].plot(epochs, val_loss, label='Validation Loss')
-        if test_loss is not None:
-            axs[0].plot(epochs, test_loss, label='Test Loss')
-        axs[0].set_xlabel('Epoch')
-        axs[0].set_ylabel('Loss')
-        axs[0].legend(loc='best')
-
-        #axs[1].plot(epochs, train_acc, label='Training Accuracy')
-        #if val_acc is not None:
-        #    axs[1].plot(epochs, val_acc, label='Validation Accuracy')
-        #if test_acc is not None:
-        #    axs[1].plot(epochs, test_acc, label='Test Accuracy')
-        axs[1].set_xlabel('Epoch')
-        axs[1].set_ylabel('Accuracy')
-        axs[1].legend(loc='best')
-
-    #plt.tight_layout()
-    #plt.savefig(out_dir + '/' + file_name)
-    #plt.close()
-
-    print(f"Performance plot saved to {out_dir}/{file_name}.png")
+        if out_dir and not os.path.exists(out_dir):
+            os.makedirs(out_dir)
+        plt.savefig(os.path.join(out_dir, f"{file_name}.pdf"), dpi=300, bbox_inches='tight')
+        plt.savefig(os.path.join(out_dir, f"{file_name}.png"), dpi=300, bbox_inches='tight')
+        plt.close()
+        print(f"Performance plot saved to {out_dir}/{file_name}")
 
 
 

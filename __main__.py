@@ -1,4 +1,5 @@
 import os
+import json
 import torch
 from SLAC25.utils import *
 from SLAC25.network import ModelWrapper
@@ -41,9 +42,10 @@ os.makedirs(args.outdir, exist_ok=True)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # create a model wrapper
-# model = ResNet(num_classes=4, keep_prob=0.75, hidden_num=512)
-model = VAE(latent_dim=1000)
-
+#model = ResNet(num_classes=4, keep_prob=0.5, hidden_num=256)
+model = BaselineCNN(num_classes=4, keep_prob=0.75)
+#model.transfer_learn()
+#model.fc_transfer_learn()
 model_wrapper = ModelWrapper(
     model_class=model,
     num_classes=4,
@@ -62,8 +64,8 @@ model_wrapper._prepareDataLoader(
     max_imgs=args.maxImgs, 
     nwork=args.nwork)
 
-log = model_wrapper.VAE_train() # this already includes testing
-
+#log = model_wrapper.train() # this already includes testing
+path = '/home/reesekaro/capstone-SLAC/final_stuff/reesekaro.Resnet50_confusion_learn.4102754/train_log.json'
 
 # visualize training performance
-visualize_performance(log, args.outdir, "train_log_VAE_test.png", is_vae=True)
+visualize_performance(path, args.outdir, "RN50_learn_final.png", model_name="ResNet50")

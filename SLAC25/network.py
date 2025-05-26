@@ -10,6 +10,10 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 from torch.utils.data import Subset
 from torchmetrics import AUROC
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.metrics import confusion_matrix
+import numpy as np
 from datetime import datetime
 
 from SLAC25.dataset import ImageDataset
@@ -22,8 +26,8 @@ class Wrapper:
         self.model = model
         self.num_epochs = num_epochs
         self.optimizer = optim.Adam(self.model.parameters())
-        self.lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', factor=0.1, patience=5, min_lr=1e-6)
-        self.EarlyStopping = EarlyStopping(patience=7, verbose=False)
+        self.lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', factor=0.1, patience=7, min_lr=1e-6)
+        self.EarlyStopping = EarlyStopping(patience=10, verbose=False)
         self.outdir = outdir
         self.verbose = verbose
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -370,7 +374,7 @@ class ModelWrapper(Wrapper):
                         print(f"{batch_idx+1:>10d} {loss.item():>12.4f} {batch_acc:>12.4f} {progress:>12}")
 
             # Calculate epoch stats
-            epoch_loss = running_loss / len(self.train_loader)
+            epoch_loss = running_loss / len(self.train_loader.dataset)
             epoch_acc = correct / total
             train_log['epoch'].append(epoch + 1)
             train_log['train_loss'].append(epoch_loss)
@@ -385,6 +389,7 @@ class ModelWrapper(Wrapper):
             self.model.eval()
             min_val_loss = float('inf')
             val_running_loss = 0.0
+            val_correct = 0
             num_val_samples = 0
             with torch.no_grad():
                 for images, labels in self.val_loader:
@@ -394,11 +399,10 @@ class ModelWrapper(Wrapper):
                     val_running_loss += loss.item()
                     num_val_samples += images.size(0)
                     _, predicted = outputs.max(1)
-                    val_total += labels.size(0)
                     val_correct += predicted.eq(labels).sum().item()
             
             val_loss = val_running_loss / num_val_samples
-            val_acc = val_correct / val_total
+            val_acc = val_correct / num_val_samples
 
             # update the minimum validation loss
             if val_loss < min_val_loss:
@@ -483,16 +487,93 @@ class ModelWrapper(Wrapper):
         return train_log
 
     def test(self):
-        # set model to eval mode so we dont update the weights
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+        from sklearn.metrics import confusion_matrix
+        import numpy as np
+        import pandas as pd
+        
+        # Set model to eval mode
+        self.model.eval()
         test_loss, test_acc = evaluate_model(self.model, self.test_loader, self.criterion, self.device)
         
-        # save as a dictionary
+        # Calculate confusion matrix
+        all_preds = []
+        all_labels = []
+        
+        with torch.no_grad():
+            for images, labels in self.test_loader:
+                images, labels = images.to(self.device), labels.to(self.device)
+                outputs = self.model(images)
+                _, predicted = outputs.max(1)
+                
+                # Collect all predictions and labels
+                all_preds.extend(predicted.cpu().numpy())
+                all_labels.extend(labels.cpu().numpy())
+
+        label_mapping = {0: "Clear", 1: "Crystal", 2: "Other", 3: "Precipitate"}
+
+        # Create class_names list in the order of label IDs
+        num_classes = len(label_mapping)
+        class_names = [label_mapping.get(i, f"Class {i}") for i in range(num_classes)]
+
+        print(f"Using class names: {class_names}")
+        
+        # Create confusion matrix
+        cm = confusion_matrix(all_labels, all_preds)
+        
+        # Calculate percentages relative to total
+        cm_perc = cm.astype('float') / cm.sum() * 100
+
+        # Prepare labels for each cell
+        cell_labels = []
+        for i in range(cm.shape[0]):
+            for j in range(cm.shape[1]):
+                if i == j:
+                    label = f"True {class_names[i]}\n{cm[i,j]}\n({cm_perc[i,j]:.1f}%)"
+                else:
+                    label = f"False {class_names[j]}\n{cm[i,j]}\n({cm_perc[i,j]:.1f}%)"
+                cell_labels.append(label)
+
+        cell_labels = np.array(cell_labels).reshape(cm.shape)
+
+        # Plot the confusion matrix
+        plt.figure(figsize=(12, 10))  # Larger figure to fit all text
+        sns.set_theme(style="darkgrid")
+
+        # Create a heatmap with annotations
+        ax = sns.heatmap(
+            cm, 
+            annot=cell_labels, 
+            fmt='', 
+            cmap='Blues',
+            xticklabels=class_names,
+            yticklabels=class_names
+        )
+
+        # Set labels and title
+        plt.xlabel('Predicted Label', fontsize=16)
+        plt.ylabel('True Label', fontsize=16)
+        plt.title('Confusion Matrix', fontsize=18)
+
+        # Tight layout to ensure everything fits
+        plt.tight_layout()
+        
+        # Save the confusion matrix
+        cm_filename = f"{self.outdir}/confusion_matrix.png"
+        plt.savefig(cm_filename, dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        print(f"Confusion matrix saved to {cm_filename}")
+
+        # Rest of your test method...
         test_log = {
             'test_loss': test_loss,
-            'test_accuracy': test_acc
+            'test_accuracy': test_acc,
+            'confusion_matrix': cm.tolist(),
+            'class_names': class_names
         }
-
-        # load existing log file...if it exists
+        
         log_file = f"{self.outdir}/train_log.json"
         try:
             with open(log_file, "r") as f:
@@ -500,16 +581,12 @@ class ModelWrapper(Wrapper):
         except FileNotFoundError:
             full_log = {}
         
-        # append the test log to the full log
         full_log['test_log'] = test_log
-
-        # save the full log to a file
+        
         with open(log_file, "w") as f:
             json.dump(full_log, f, indent=4)
-            
+        
         return test_log
-
-
 
 if __name__ == "__main__":
     ########## parse arguments #########

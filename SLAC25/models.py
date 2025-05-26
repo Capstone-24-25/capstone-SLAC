@@ -40,7 +40,7 @@ class ResNet(nn.Module):
         return x
     
     # only one transfer learning phase for the last layer
-    def transfer_learn_phase(self):
+    def transfer_learn(self):
         """
         Freeze all Conv layers except layer3–4; train those plus the new FC head.
         """
@@ -59,6 +59,19 @@ class ResNet(nn.Module):
                 p.requires_grad = True
 
         print(f"{'#'*3} Transfer learning phase completed {'#'*3}")
+
+    def fc_transfer_learn(self):
+        '''
+        only train the fully connected layers
+        '''
+        for p in self.resnet.parameters():
+            p.requires_grad = False
+
+        for p in [self.fc_layer1, self.fc_layer2, self.fc_layer3]:
+            for param in p.parameters():
+                param.requires_grad = True
+
+        print(f"{'#'*3} Fully connected layers transfer learning phase completed {'#'*3}")
 
 
 # create an VAE model using resnet50 encoder and UNet decoder

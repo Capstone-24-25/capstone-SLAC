@@ -152,14 +152,62 @@ class ImageDataset(Dataset):
     for l in range(self.numLabel):
       print(f"Label {l}: {len(self.labeldict[l])} | {len(self.labeldict[l]) / self.datasize * 100:.2f}%")
     print(f"{'='*40}")
- 
 
+  def get_label_counts(self):
+    '''
+    Returns a dictionary of label counts.
+    '''
+    return {label: len(self.labeldict[label]) for label in range(self.numLabel)}
+
+  def plot_label_distribution(self):
+    '''function that takes a list of csv files, collects the label distribution, and plots it'''
+    
+    datasets = {
+      'train': '/home/reesekaro/capstone-SLAC/data/train_info.csv',
+      'val': '/home/reesekaro/capstone-SLAC/data/val_info.csv',
+      'test': '/home/reesekaro/capstone-SLAC/data/test_info.csv'
+    }
+
+    label_names = ['Clear', 'Crystal', 'Other', 'Precipitate']
+    all_counts = {}
+
+    for name, path in datasets.items():
+      Data = ImageDataset(path, transform=None, config=None, recordTransform=True)
+      counts = Data.get_label_counts()
+      all_counts[name] = [counts.get(label, 0) for label in range(len(label_names))]
+
+    x = np.arange(len(label_names))
+    width = 0.25
+    fig, ax = plt.subplots(figsize=(10, 5))
+    for i, label in enumerate(label_names):
+      values = [all_counts[dataset][i] for dataset in datasets]
+      ax.bar(x + width * i, values, width, label=label)
+      
+    ax.set_xlabel('Dataset')
+    ax.set_ylabel('Count')
+    ax.set_title('Label Distribution Across Datasets')
+    ax.set_xticks(x)
+    ax.set_xticklabels(label_names)
+    ax.legend()
+
+    plt.savefig(os.path.join(os.path.expanduser('~'), 'capstone-SLAC', 'models', 'label_distribution.png'))
+    plt.close(fig)
 
 if __name__ == "__main__":
   package_root = os.path.dirname(os.path.abspath(__file__))
-  data_path = os.path.join(package_root, "..", "data", "train_info.csv")
-  data_path = os.path.abspath(data_path)
-  testData = ImageDataset(data_path, transform=None, config=None, recordTransform=True)
+  train_data_path = os.path.join(package_root, "..", "data", "train_info.csv")
+  val_data_path = os.path.join(package_root, "..", "data", "val_info.csv")
+  test_data_path = os.path.join(package_root, "..", "data", "test_info.csv")
+  train_data_path = os.path.abspath(train_data_path)
+  val_data_path = os.path.abspath(val_data_path)
+  test_data_path = os.path.abspath(test_data_path)
+  trainData = ImageDataset(train_data_path, transform=None, config=None, recordTransform=True)
+  valData = ImageDataset(val_data_path, transform=None, config=None, recordTransform=True)
+  testData = ImageDataset(test_data_path, transform=None, config=None, recordTransform=True)
 
-  testData.visualizeAndSave(123)
-  # print(data_path)
+  # testData.summary()
+  # valData.summary()
+  # trainData.summary()
+
+  # just need one of the datasets to plot the label distribution since it includes the paths to the images
+  trainData.plot_label_distribution()
