@@ -1,5 +1,11 @@
 import re
 import matplotlib.pyplot as plt
+from matplotlib import rcParams
+
+# Set all default fonts and axes text to bold
+rcParams['font.weight'] = 'bold'
+plt.rcParams['axes.labelweight'] = 'bold'
+plt.rcParams['axes.titleweight'] = 'bold'
 
 # File path
 log_file = "test_2025-05-01_16-40-08.out"
@@ -29,22 +35,26 @@ with open(log_file, 'r') as f:
 plt.figure(figsize=(12, 5))
 
 plt.subplot(1, 2, 1)
-plt.plot(train_loss, label="Train Loss")
-plt.plot(test_loss, label="Test Loss")
-plt.xlabel("Epoch")
-plt.ylabel("Loss")
-plt.title("AutoEncoder Loss")
-plt.legend()
+plt.plot(train_loss, label="Train Loss", linewidth=2.5)
+plt.plot(test_loss, label="Test Loss", linewidth=2.5)
+plt.xlabel("Epoch", fontsize=16, fontweight='bold')
+plt.ylabel("Loss", fontsize=16, fontweight='bold')
+plt.title("AutoEncoder Loss", fontsize=18, fontweight='bold')
+plt.xticks(fontsize=14, fontweight='bold')
+plt.yticks(fontsize=14, fontweight='bold')
+plt.legend(fontsize=14, frameon=True)
 plt.grid(True)
 
 # Plot classifier accuracy
 plt.subplot(1, 2, 2)
-plt.plot(classifier_accuracy, label="Classifier Accuracy", color="green")
-plt.xlabel("Epoch")
-plt.ylabel("Accuracy")
-plt.title("Classifier Accuracy")
-plt.ylim(0, 1)  # Accuracy from 0 to 1
-plt.legend()
+plt.plot(classifier_accuracy, label="Classifier Accuracy", color="green", linewidth=2.5)
+plt.xlabel("Epoch", fontsize=16, fontweight='bold')
+plt.ylabel("Accuracy", fontsize=16, fontweight='bold')
+plt.title("Classifier Accuracy", fontsize=18, fontweight='bold')
+plt.xticks(fontsize=14, fontweight='bold')
+plt.yticks(fontsize=14, fontweight='bold')
+plt.ylim(0, 1)
+plt.legend(fontsize=14, frameon=True)
 plt.grid(True)
 
 plt.tight_layout()

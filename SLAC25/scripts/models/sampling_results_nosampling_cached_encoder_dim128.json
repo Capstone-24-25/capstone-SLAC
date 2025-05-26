@@ -1,0 +1,7 @@
+{
+    "nosampling_cached": {
+        "loss": 0.9331933697564081,
+        "accuracy": 0.6034393602308941,
+        "compression_dim": 128
+    }
+}

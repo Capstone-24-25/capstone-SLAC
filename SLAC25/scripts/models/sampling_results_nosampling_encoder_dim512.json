@@ -1,0 +1,7 @@
+{
+    "nosampling": {
+        "loss": 1.3813664880958763,
+        "accuracy": 0.2871980676328502,
+        "compression_dim": 512
+    }
+}
