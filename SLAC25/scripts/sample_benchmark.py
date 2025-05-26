@@ -7,207 +7,109 @@ import json
 import os
 import pandas as pd
 from torchvision import transforms
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader
 from argparse import ArgumentParser
-from PIL import Image
-from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
-import matplotlib.pyplot as plt
 
-# Step 1: Define AutoEncoder class
-class AutoEncoder(nn.Module):
-    def __init__(self, encoded_dim):
-        super(AutoEncoder, self).__init__()
-        self.encoder = nn.Sequential(
-            nn.Conv2d(3, 16, kernel_size=3, stride=2, padding=1),
-            nn.ReLU(True),
-            nn.Conv2d(16, 32, kernel_size=3, stride=2, padding=1),
-            nn.ReLU(True),
-            nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1),
-            nn.ReLU(True),
-            nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1),
-            nn.ReLU(True),
-            nn.Flatten(),
-            nn.Linear(128 * 32 * 32, encoded_dim)
-        )
-        self.decoder = nn.Sequential(
-            nn.Linear(encoded_dim, 128 * 32 * 32),
-            nn.Unflatten(1, (128, 32, 32)),
-            nn.ConvTranspose2d(128, 64, kernel_size=3, stride=2, padding=1, output_padding=1),
-            nn.ReLU(True),
-            nn.ConvTranspose2d(64, 32, kernel_size=3, stride=2, padding=1, output_padding=1),
-            nn.ReLU(True),
-            nn.ConvTranspose2d(32, 16, kernel_size=3, stride=2, padding=1, output_padding=1),
-            nn.ReLU(True),
-            nn.ConvTranspose2d(16, 3, kernel_size=3, stride=2, padding=1, output_padding=1),
-            nn.Sigmoid()
-        )
+from SLAC25.dataset import ImageDataset
+from SLAC25.utils import evaluate_model
+from SLAC25.models import BaselineCNN, ResNet
+from SLAC25.sampler import StratifiedSampler, WeightedRandomSampler, EqualGroupSampler, create_sample_weights
 
-    def forward(self, x):
-        z = self.encoder(x)
-        x_hat = self.decoder(z)
-        return x_hat, z
-
-# Step 2: Define Dataset class for autoencoder
-class AutoEncoderTrainingDataset(Dataset):
-    def __init__(self, csv_path, device):
-        self.df = pd.read_csv(csv_path)
-        self.device = device
-
-    def __len__(self):
-        return len(self.df)
-
-    def __getitem__(self, idx):
-        row = self.df.iloc[idx]
-        image_path = row['image_path']
-        img = Image.open(image_path).convert('RGB')
-        img = transforms.Resize((512, 512))(img)
-        img = transforms.ToTensor()(img).to(self.device)
-        return img, img
-
-# python sample_benchmark.py --method stratified --encoded_dim 2048 --ae_epochs 100 --num_epochs 100 --batch_size 32 --sample_frac 0.001
-# Step 3: Training loop for autoencoder
-def pretrain_autoencoder(model, dataloader, num_epochs, optimizer, criterion, device, test_dataloader=None):
+def fit(model, dataloader, num_epochs, optimizer, criterion, device):
+    model.train()
     for epoch in range(num_epochs):
-        model.train()
         running_loss = 0.0
-        for ii, (inputs, targets) in enumerate(dataloader):
-            inputs, targets = inputs.to(device), targets.to(device)
+        correct = 0
+        total = 0
+
+        for inputs, labels in dataloader:
+            inputs, labels = inputs.to(device), labels.to(device)
+
             optimizer.zero_grad()
-            outputs, _ = model(inputs)
-            loss = criterion(outputs, targets)
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
+
             running_loss += loss.item() * inputs.size(0)
-        epoch_loss = running_loss / len(dataloader.dataset)
-        if test_dataloader is not None:
-            model.eval()
-            test_running_loss = 0
-            with torch.no_grad():
-                for inputs, targets in test_dataloader:
-                    inputs, targets = inputs.to(device), targets.to(device)
-                    outputs, _ = model(inputs)
-                    loss = criterion(outputs, targets)
-                    test_running_loss += loss.item() * inputs.size(0)
-            test_epoch_loss = test_running_loss / len(test_dataloader.dataset)
+            _, predicted = torch.max(outputs.data, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
 
-# Step 4: Classifier training loop with confusion matrix logging
-def fit_and_log(model, dataloader, num_epochs, optimizer, criterion, device, output_path):
-    model.train()
-    all_labels = []
-    all_preds = []
-    with open(output_path, 'a') as log_file:
-        for epoch in range(num_epochs):
-            running_loss = 0.0
-            correct = 0
-            total = 0
-            for inputs, labels in dataloader:
-                inputs, labels = inputs.to(device), labels.to(device)
-                optimizer.zero_grad()
-                outputs = model(inputs)
-                loss = criterion(outputs, labels)
-                loss.backward()
-                optimizer.step()
-                running_loss += loss.item() * inputs.size(0)
-                _, predicted = torch.max(outputs.data, 1)
-                total += labels.size(0)
-                correct += (predicted == labels).sum().item()
+        epoch_loss = running_loss / total
+        epoch_acc = correct / total
 
-                all_labels.extend(labels.cpu().numpy())
-                all_preds.extend(predicted.cpu().numpy())
+        print(f"Epoch [{epoch+1}/{num_epochs}] Loss: {epoch_loss:.4f} Accuracy: {epoch_acc:.4f}")
 
-            epoch_loss = running_loss / total
-            epoch_acc = correct / total
 
-            log_file.write(f"Epoch [{epoch+1}/{num_epochs}] Loss: {epoch_loss:.4f} Accuracy: {epoch_acc:.4f}\n")
-
-            # Calculate and log confusion matrix
-            cm = confusion_matrix(all_labels, all_preds)
-            cm_display = ConfusionMatrixDisplay(confusion_matrix=cm)
-            cm_display.plot(cmap='Blues')
-            cm_plot_path = os.path.join(args.outdir, f"confusion_matrix_epoch{epoch+1}.png")
-            plt.savefig(cm_plot_path)
-            plt.close()
-
-            log_file.write(f"Confusion Matrix Epoch {epoch+1}:\n")
-            log_file.write(f"{cm}\n")
-            log_file.write(f"Saved confusion matrix plot for epoch {epoch+1} at {cm_plot_path}\n")
-
-# Step 5: Parse command-line arguments
+# Argument Parsing
 ap = ArgumentParser()
-ap.add_argument("--sample_frac", type=float, default=0.15)
-ap.add_argument("--method", type=str, choices=["original", "stratified", "equal", "weighted"])
-ap.add_argument("--num_epochs", type=int, default=5)
-ap.add_argument("--ae_epochs", type=int, default=10)
-ap.add_argument("--learning_rate", type=float, default=0.001)
-ap.add_argument("--batch_size", type=int, default=32)
-ap.add_argument("--encoded_dim", type=int, default=128)
-ap.add_argument("--outdir", type=str, default="./models")
-ap.add_argument("--verbose", action="store_true")
+ap.add_argument("--method", type=str, choices=["original", "stratified", "equal", "weighted"], help="Sampling method")
+ap.add_argument("--num_epochs", type=int, default=5, help="Number of epochs for training")
+ap.add_argument("--learning_rate", type=float, default=0.001, help="Learning rate")
+ap.add_argument("--batch_size", type=int, default=32, help="Batch size")
+ap.add_argument("--model", type=str, choices=["BaselineCNN", "ResNet"], default="BaselineCNN", help="Model type")
+ap.add_argument("--outdir", type=str, default="./models", help="Directory to save results")
+ap.add_argument("--verbose", action="store_true", help="Enable verbose output")
 args = ap.parse_args()
 
-# Step 6: Prepare dataset and sampling
-csv_train_file = "../../data/train_info.csv"
+# Data Augmentation (optional, can be used inside ImageDataset or transform pipeline if needed)
+augmentation = transforms.Compose([
+    transforms.RandomHorizontalFlip(),
+    transforms.RandomRotation(20),
+    transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
+    transforms.RandomResizedCrop(224, scale=(0.8, 1.0))
+])
+
+# Load dataset CSV (sampled)
+dir_name = os.path.dirname(__file__)
+csv_train_file = os.path.join(dir_name, "../../data/train_info.csv")
 df = pd.read_csv(csv_train_file)
-df_sampled = df.sample(frac=args.sample_frac, random_state=42)
+df_sampled = df.sample(frac=0.05, random_state=42)
+sampled_csv_file = os.path.join(dir_name, "../../data/train_info_sampled.csv")
+df_sampled.to_csv(sampled_csv_file, index=False)
 
-# Step 7: Initialize and train autoencoder
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-autoencoder = AutoEncoder(encoded_dim=args.encoded_dim).to(device)
-ae_dataset = AutoEncoderTrainingDataset(csv_train_file, device)
-train_dataloader = DataLoader(ae_dataset, batch_size=args.batch_size, shuffle=True)
-ae_criterion = nn.MSELoss()
-ae_optimizer = optim.Adam(autoencoder.parameters(), lr=args.learning_rate)
+# Load dataset
+print("Loading dataset...")
+dataset = ImageDataset(sampled_csv_file)
 
-pretrain_autoencoder(autoencoder, train_dataloader, args.ae_epochs, ae_optimizer, ae_criterion, device)
+# Define sampling strategy
+sampler = None
+if args.method == "stratified":
+    sampler = StratifiedSampler(dataset, samplePerGroup=100)
+elif args.method == "equal":
+    sampler = EqualGroupSampler(dataset, samplePerGroup=100, bootstrap=True)
+elif args.method == "weighted":
+    weights = create_sample_weights(dataset)
+    sampler = WeightedRandomSampler(dataset, weights, total_samples=1000, allowRepeat=True)
 
-# Step 8: Define classifier and dataset
-class MLPClassifier(nn.Module):
-    def __init__(self, input_dim=128, num_classes=4):
-        super(MLPClassifier, self).__init__()
-        self.net = nn.Sequential(
-            nn.Linear(input_dim, 64),
-            nn.ReLU(),
-            nn.Linear(64, num_classes)
-        )
+# Build DataLoader
+if sampler:
+    data_loader = DataLoader(dataset, batch_size=args.batch_size, sampler=sampler)
+else:
+    data_loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
 
-    def forward(self, x):
-        return self.net(x)
+# Select Model
+model_class = BaselineCNN if args.model == "BaselineCNN" else ResNet
+model = model_class(num_classes=4, keep_prob=0.75).to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
 
-class AutoEncodedDataset(Dataset):
-    def __init__(self, csv_path, ae_model, device):
-        self.df = pd.read_csv(csv_path)
-        self.ae_model = ae_model.eval()
-        self.device = device
-
-    def __len__(self):
-        return len(self.df)
-
-    def __getitem__(self, idx):
-        row = self.df.iloc[idx]
-        img = Image.open(row['image_path']).convert('RGB')
-        img = transforms.Resize((512, 512))(img)
-        img = transforms.ToTensor()(img).to(self.device)
-        _, compressed = self.ae_model(img.unsqueeze(0))
-        return compressed.view(-1).detach(), torch.tensor(row['label_id'], dtype=torch.long)
-
-# Step 9: Set up classifier training
-dataset = AutoEncodedDataset(csv_train_file, autoencoder, device)
-sampler = None  # Adjust your sampler setup here if needed
-data_loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
-
-# Step 10: Train classifier
-model = MLPClassifier(input_dim=args.encoded_dim, num_classes=4).to(device)
+# Loss and Optimizer
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=args.learning_rate)
 
-output_path = os.path.join(args.outdir, f"training_log_{args.method}_autoenc_dim{args.encoded_dim}.out")
-fit_and_log(model, data_loader, args.num_epochs, optimizer, criterion, device, output_path)
+# Training
+print(f"Training with {args.method} using {args.model} model...")
+fit(model, data_loader, args.num_epochs, optimizer, criterion, device=torch.device("cuda" if torch.cuda.is_available() else "cpu"))
 
-# Step 11: Save results
-results = {"loss": test_loss, "accuracy": test_acc, "compression_dim": args.encoded_dim}
+# Evaluation
+print("Evaluating model...")
+test_loss, test_acc = evaluate_model(model, data_loader, criterion, torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+results = {args.method: {"loss": test_loss, "accuracy": test_acc}}
+
+# Save results
 os.makedirs(args.outdir, exist_ok=True)
-output_path_json = os.path.join(args.outdir, f"sampling_results_{args.method}_autoenc_dim{args.encoded_dim}.json")
-with open(output_path_json, "w") as f:
+output_path = os.path.join(args.outdir, f"sampling_results_{args.method}.json")
+with open(output_path, "w") as f:
     json.dump(results, f, indent=4)
 
-print("Experiment completed! Results saved at:", output_path_json)
+print("Experiment completed! Results saved at:", output_path)
